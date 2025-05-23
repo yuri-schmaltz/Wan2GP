@@ -111,7 +111,7 @@ class WanT2V:
 
             self.adapt_vace_model()
 
-    def vace_encode_frames(self, frames, ref_images, masks=None, tile_size = 0, overlapped_latents = 0, overlap_noise = 0):
+    def vace_encode_frames(self, frames, ref_images, masks=None, tile_size = 0, overlapped_latents = None):
         if ref_images is None:
             ref_images = [None] * len(frames)
         else:
@@ -123,10 +123,10 @@ class WanT2V:
             inactive = [i * (1 - m) + 0 * m for i, m in zip(frames, masks)]
             reactive = [i * m + 0 * (1 - m) for i, m in zip(frames, masks)]
             inactive = self.vae.encode(inactive, tile_size = tile_size)
-            # inactive = [ t  * (1.0 - noise_factor) + torch.randn_like(t ) * noise_factor for t in inactive]
-            # if overlapped_latents > 0:
-            #     for t in inactive:
-            #         t[:, :overlapped_latents ]   = t[:, :overlapped_latents ]  * (1.0 - noise_factor) + torch.randn_like(t[:, :overlapped_latents ] ) * noise_factor 
+            self.toto = inactive[0].clone() 
+            if overlapped_latents  != None : 
+                # inactive[0][:, 0:1] = self.vae.encode([frames[0][:, 0:1]], tile_size = tile_size)[0] # redundant
+                inactive[0][:, 1:overlapped_latents.shape[1] + 1] = overlapped_latents
 
             reactive = self.vae.encode(reactive, tile_size = tile_size)
             latents = [torch.cat((u, c), dim=0) for u, c in zip(inactive, reactive)]
@@ -190,13 +190,13 @@ class WanT2V:
             num_frames = total_frames - prepend_count 
             if sub_src_mask is not None and sub_src_video is not None:
                 src_video[i], src_mask[i], _, _, _ = self.vid_proc.load_video_pair(sub_src_video, sub_src_mask, max_frames= num_frames, trim_video = trim_video - prepend_count, start_frame = start_frame, canvas_height = canvas_height, canvas_width = canvas_width, fit_into_canvas = fit_into_canvas)
-                # src_video is [-1, 1], 0 = inpainting area (in fact 127  in [0, 255])
-                # src_mask is [-1, 1], 0 = preserve original video (in fact 127  in [0, 255]) and 1 = Inpainting (in fact 255  in [0, 255])
+                # src_video is [-1, 1] (at this function output), 0 = inpainting area (in fact 127  in [0, 255])
+                # src_mask is [-1, 1] (at this function output), 0 = preserve original video (in fact 127  in [0, 255]) and 1 = Inpainting (in fact 255  in [0, 255])
                 src_video[i] = src_video[i].to(device)
                 src_mask[i] = src_mask[i].to(device)
                 if prepend_count > 0:
                     src_video[i] =  torch.cat( [sub_pre_src_video, src_video[i]], dim=1)
-                    src_mask[i] =  torch.cat( [torch.zeros_like(sub_pre_src_video), src_mask[i]] ,1)
+                    src_mask[i] =  torch.cat( [torch.full_like(sub_pre_src_video, -1.0), src_mask[i]] ,1)
                 src_video_shape = src_video[i].shape
                 if src_video_shape[1] != total_frames:
                     src_video[i] =  torch.cat( [src_video[i], src_video[i].new_zeros(src_video_shape[0], total_frames -src_video_shape[1], *src_video_shape[-2:])], dim=1)
@@ -300,7 +300,8 @@ class WanT2V:
                 slg_end = 1.0,
                 cfg_star_switch = True,
                 cfg_zero_step = 5,
-                overlapped_latents  = 0,
+                overlapped_latents  = None,
+                return_latent_slice = None,
                 overlap_noise = 0,
                 model_filename = None,
                 **bbargs
@@ -373,8 +374,10 @@ class WanT2V:
             input_frames = [u.to(self.device) for u in input_frames]
             input_ref_images = [ None if u == None else [v.to(self.device) for v in u]  for u in input_ref_images]
             input_masks = [u.to(self.device) for u in input_masks]
-
-            z0 = self.vace_encode_frames(input_frames, input_ref_images, masks=input_masks, tile_size = VAE_tile_size, overlapped_latents = overlapped_latents, overlap_noise = overlap_noise )
+            previous_latents = None
+            # if overlapped_latents != None:
+                # input_ref_images = [u[-1:] for u in input_ref_images]
+            z0 = self.vace_encode_frames(input_frames, input_ref_images, masks=input_masks, tile_size = VAE_tile_size, overlapped_latents = overlapped_latents )
             m0 = self.vace_encode_masks(input_masks, input_ref_images)
             z = self.vace_latent(z0, m0)
 
@@ -442,8 +445,9 @@ class WanT2V:
         if vace:
             ref_images_count = len(input_ref_images[0]) if input_ref_images != None and input_ref_images[0] != None else 0 
             kwargs.update({'vace_context' : z, 'vace_context_scale' : context_scale})
-            if overlapped_latents > 0:
-                z_reactive = [  zz[0:16, ref_images_count:overlapped_latents + ref_images_count].clone() for zz in z]
+            if overlapped_latents != None:
+                overlapped_latents_size = overlapped_latents.shape[1] + 1
+                z_reactive = [  zz[0:16, 0:overlapped_latents_size + ref_images_count].clone() for zz in z]
 
 
         if self.model.enable_teacache:
@@ -453,13 +457,14 @@ class WanT2V:
         if callback != None:
             callback(-1, None, True)
         for i, t in enumerate(tqdm(timesteps)):
-            if vace and overlapped_latents > 0 :
-                # noise_factor = overlap_noise *(i/(len(timesteps)-1)) / 1000
-                noise_factor = overlap_noise / 1000 # * (999-t) / 999
-                # noise_factor = overlap_noise / 1000 # * t / 999
-                for zz, zz_r in zip(z, z_reactive):
-                    zz[0:16, ref_images_count:overlapped_latents + ref_images_count]   = zz_r  * (1.0 - noise_factor) + torch.randn_like(zz_r ) * noise_factor 
-
+            if overlapped_latents != None:
+                # overlap_noise_factor = overlap_noise *(i/(len(timesteps)-1)) / 1000
+                overlap_noise_factor = overlap_noise / 1000 
+                latent_noise_factor = t / 1000
+                for zz, zz_r, ll in zip(z, z_reactive, [latents]):
+                    pass
+                    zz[0:16, ref_images_count:overlapped_latents_size + ref_images_count]   = zz_r[:, ref_images_count:]  * (1.0 - overlap_noise_factor) + torch.randn_like(zz_r[:, ref_images_count:] ) * overlap_noise_factor 
+                    ll[:, 0:overlapped_latents_size + ref_images_count]   = zz_r  * (1.0 - latent_noise_factor) + torch.randn_like(zz_r ) * latent_noise_factor 
             if target_camera != None:
                 latent_model_input = torch.cat([latents, source_latents], dim=1)
             else:
@@ -552,6 +557,13 @@ class WanT2V:
 
         x0 = [latents]
 
+        if return_latent_slice != None:
+            if overlapped_latents != None:
+                # latents [:, 1:] = self.toto
+                for zz, zz_r, ll  in zip(z, z_reactive, [latents]):
+                    ll[:, 0:overlapped_latents_size + ref_images_count]   = zz_r 
+
+            latent_slice = latents[:, return_latent_slice].clone()
         if input_frames == None:
             if phantom:
                 # phantom post processing
@@ -560,11 +572,9 @@ class WanT2V:
         else:
             # vace post processing
             videos = self.decode_latent(x0, input_ref_images, VAE_tile_size)
-
-        del latents
-        del sample_scheduler
-
-        return videos[0] if self.rank == 0 else None
+        if return_latent_slice != None:
+            return { "x" : videos[0], "latent_slice" : latent_slice }
+        return videos[0]
 
     def adapt_vace_model(self):
         model = self.model

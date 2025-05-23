@@ -1502,7 +1502,7 @@ class LTXVideoPipeline(DiffusionPipeline):
                         extra_conditioning_mask.append(conditioning_mask)
 
         # Patchify the updated latents and calculate their pixel coordinates
-        init_latents, init_latent_coords = self.patchifier.patchify(
+            init_latents, init_latent_coords = self.patchifier.patchify(
             latents=init_latents
         )
         init_pixel_coords = latent_to_pixel_coords(
