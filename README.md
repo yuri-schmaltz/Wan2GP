@@ -21,6 +21,10 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 
 
 ## 🔥 Latest News!!
+* May 26 2025: 👋 Wan 2.1GP v5.3 : Happy with a Video generation and want to do more generations using the same settings but you can't remember what you did or you find it to hard to copy / paste one per one each setting from the file metadata ? Rejoice ! There are now multiple ways to turn this tedious process into a one click task: 
+    - Select one Video recently generated in the Video Gallery and click *Use Selected Video Settings*
+    - Click *Drop File Here*  and select a Video you saved somewhere, if the settings metadata have been saved with the Video you will be able to extract them automatically
+    - Click *Export Settings to File* to save on your harddrive the current settings. You will be able to use them later again by clicking *Drop File Here* and select this time a Settings json file  
 * May 23 2025: 👋 Wan 2.1GP v5.21 : Improvements for Vace: better transitions between Sliding Windows,Support for Image masks in Matanyone, new Extend Video for Vace, different types of automated background removal 
 * May 20 2025: 👋 Wan 2.1GP v5.2 : Added support for Wan CausVid which is a distilled Wan model that can generate nice looking videos in only 4 to 12 steps.
  The great thing is that Kijai (Kudos to him !) has created a CausVid Lora that can be combined with any existing Wan t2v model 14B like Wan Vace 14B.
