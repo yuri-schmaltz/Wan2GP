@@ -43,7 +43,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.4.7"
-WanGP_version = "5.3"
+WanGP_version = "5.31"
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
 from importlib.metadata import version
@@ -1525,11 +1525,12 @@ for path in  ["wan2.1_Vace_1.3B_preview_bf16.safetensors", "sky_reels2_diffusion
         os.remove( os.path.join("ckpts" , path))
 
 
-wan_choices_t2v=["ckpts/wan2.1_text2video_1.3B_bf16.safetensors", "ckpts/wan2.1_text2video_14B_bf16.safetensors", "ckpts/wan2.1_text2video_14B_quanto_int8.safetensors", "ckpts/wan2.1_Vace_1.3B_mbf16.safetensors", 
+wan_choices_t2v=["ckpts/wan2.1_text2video_1.3B_bf16.safetensors", "ckpts/wan2.1_text2video_14B_bf16.safetensors", "ckpts/wan2.1_text2video_14B_quanto_int8.safetensors",  
                          "ckpts/wan2.1_recammaster_1.3B_bf16.safetensors", "ckpts/sky_reels2_diffusion_forcing_1.3B_mbf16.safetensors", "ckpts/sky_reels2_diffusion_forcing_14B_bf16.safetensors",
                         "ckpts/sky_reels2_diffusion_forcing_14B_quanto_int8.safetensors",  "ckpts/sky_reels2_diffusion_forcing_720p_14B_mbf16.safetensors","ckpts/sky_reels2_diffusion_forcing_720p_14B_quanto_mbf16_int8.safetensors", 
-                        "ckpts/wan2_1_phantom_1.3B_mbf16.safetensors", "ckpts/wan2.1_Vace_14B_mbf16.safetensors", "ckpts/wan2.1_Vace_14B_quanto_mbf16_int8.safetensors",
+                        "ckpts/wan2.1_Vace_1.3B_mbf16.safetensors", "ckpts/wan2.1_Vace_14B_mbf16.safetensors", "ckpts/wan2.1_Vace_14B_quanto_mbf16_int8.safetensors",
                         "ckpts/wan2.1_moviigen1.1_14B_mbf16.safetensors", "ckpts/wan2.1_moviigen1.1_14B_quanto_mbf16_int8.safetensors",
+                        "ckpts/wan2_1_phantom_1.3B_mbf16.safetensors", "ckpts/wan2.1_phantom_14B_mbf16.safetensors", "ckpts/wan2.1_phantom_14B_quanto_mbf16_int8.safetensors", 
                         ]    
 wan_choices_i2v=["ckpts/wan2.1_image2video_480p_14B_mbf16.safetensors", "ckpts/wan2.1_image2video_480p_14B_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_image2video_720p_14B_mbf16.safetensors",
                         "ckpts/wan2.1_image2video_720p_14B_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_Fun_InP_1.3B_bf16.safetensors", "ckpts/wan2.1_Fun_InP_14B_bf16.safetensors",
@@ -1548,12 +1549,12 @@ def get_dependent_models(model_filename, quantization, dtype_policy ):
         return [get_model_filename("ltxv_13B", quantization, dtype_policy)]
     else:
         return []
-model_types = [ "t2v_1.3B", "t2v", "i2v", "i2v_720p", "flf2v_720p", "vace_1.3B","vace_14B","moviigen", "phantom_1.3B", "fantasy",  "fun_inp_1.3B", "fun_inp", "recam_1.3B",  "sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled", "hunyuan", "hunyuan_i2v", "hunyuan_custom"]
+model_types = [ "t2v_1.3B", "t2v", "i2v", "i2v_720p", "flf2v_720p", "vace_1.3B","vace_14B","moviigen", "phantom_1.3B", "phantom_14B", "fantasy",  "fun_inp_1.3B", "fun_inp", "recam_1.3B",  "sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled", "hunyuan", "hunyuan_i2v", "hunyuan_custom"]
 model_signatures = {"t2v": "text2video_14B", "t2v_1.3B" : "text2video_1.3B",   "fun_inp_1.3B" : "Fun_InP_1.3B",  "fun_inp" :  "Fun_InP_14B", 
                     "i2v" : "image2video_480p", "i2v_720p" : "image2video_720p" , "vace_1.3B" : "Vace_1.3B", "vace_14B" : "Vace_14B","recam_1.3B": "recammaster_1.3B", 
                     "flf2v_720p" : "FLF2V_720p", "sky_df_1.3B" : "sky_reels2_diffusion_forcing_1.3B", "sky_df_14B" : "sky_reels2_diffusion_forcing_14B", 
                     "sky_df_720p_14B" : "sky_reels2_diffusion_forcing_720p_14B",  "moviigen" :"moviigen",
-                     "phantom_1.3B" : "phantom_1.3B", "fantasy" : "fantasy", "ltxv_13B" : "ltxv_0.9.7_13B_dev", "ltxv_13B_distilled" : "ltxv_0.9.7_13B_distilled",  "hunyuan" : "hunyuan_video_720", "hunyuan_i2v" : "hunyuan_video_i2v_720", "hunyuan_custom" : "hunyuan_video_custom" }
+                     "phantom_1.3B" : "phantom_1.3B", "phantom_14B" : "phantom_14B", "fantasy" : "fantasy", "ltxv_13B" : "ltxv_0.9.7_13B_dev", "ltxv_13B_distilled" : "ltxv_0.9.7_13B_distilled",  "hunyuan" : "hunyuan_video_720", "hunyuan_i2v" : "hunyuan_video_i2v_720", "hunyuan_custom" : "hunyuan_video_custom" }
 
 
 def get_model_type(model_filename):
@@ -1611,8 +1612,12 @@ def get_model_name(model_filename, description_container = [""]):
         description = "The SkyReels 2 Diffusion Forcing model has been designed to generate very long videos that exceeds the usual 5s limit. You can also use this model to extend any existing video."
     elif "phantom" in model_filename:
         model_name = "Wan2.1 Phantom"
-        model_name += " 14B" if "14B" in model_filename else " 1.3B"
-        description = "The Phantom model is specialized to transfer people or objects of your choice into a generated Video. It produces very nices results when used at 720p."
+        if "14B" in model_filename:
+            model_name += " 14B"
+            description = "The Phantom model is specialized to transfer people or objects of your choice into a generated Video. It seems to produce better results if you keep the original background of the Image Referendes."
+        else:
+            model_name += " 1.3B"
+            description = "The Phantom model is specialized to transfer people or objects of your choice into a generated Video. It produces very nice results when used at 720p."
     elif "fantasy" in model_filename:
         model_name = "Wan2.1 Fantasy Speaking 720p"
         model_name += " 14B" if "14B" in model_filename else " 1.3B"
@@ -1741,11 +1746,12 @@ def get_default_settings(filename):
             })
 
 
-        if get_model_type(filename) in ("phantom_1.3B"):
+        if get_model_type(filename) in ("phantom_1.3B", "phantom_14B"):
             ui_defaults.update({
                 "guidance_scale": 7.5,
                 "flow_shift": 5,
-                "resolution": "1280x720" 
+                "remove_background_images_ref": 0,
+                # "resolution": "1280x720" 
             })
 
         elif get_model_type(filename) in ("hunyuan_custom"):
