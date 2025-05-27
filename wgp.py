@@ -4122,6 +4122,7 @@ def load_settings_from_file(state, file_path):
         return gr.update(), gr.update(), None
 
     configs = None
+    tags = None
     if file_path.endswith(".json"):
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -4130,7 +4131,6 @@ def load_settings_from_file(state, file_path):
             pass
     else:
         from mutagen.mp4 import MP4
-        tags = None
         try:
             file = MP4(file_path)
             tags = file.tags['©cmt'][0] 
@@ -4144,7 +4144,7 @@ def load_settings_from_file(state, file_path):
 
     prompt = configs.get("prompt", "")
     current_model_filename = state["model_filename"]
-    model_filename = configs["model_filename"]
+    model_filename = configs.get("model_filename", current_model_filename)
     model_type = get_model_type(model_filename)
     defaults = state.get(model_type, None) 
     defaults = get_default_settings(model_filename) if defaults == None else defaults
