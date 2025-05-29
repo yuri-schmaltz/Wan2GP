@@ -477,7 +477,7 @@ class WanT2V:
                 pass
                 overlap_noise_factor = overlap_noise / 1000 
                 latents[:, conditioning_latents_size + ref_images_count:]   = latents[:, conditioning_latents_size + ref_images_count:]  * (1.0 - overlap_noise_factor) + torch.randn_like(latents[:, conditioning_latents_size + ref_images_count:]) * overlap_noise_factor 
-                timestep = [torch.tensor([t.item()] * (conditioning_latents_size + ref_images_count) + [t.item() - overlap_noise]*(len(timesteps) - conditioning_latents_size - ref_images_count))]
+                #timestep = [torch.tensor([t.item()] * (conditioning_latents_size + ref_images_count) + [t.item() - overlap_noise]*(len(timesteps) - conditioning_latents_size - ref_images_count))]
 
             if target_camera != None:
                 latent_model_input = torch.cat([latents, source_latents], dim=1)
