@@ -17,6 +17,8 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 
 **Discord Server to get Help from Other Users and show your Best Videos:** https://discord.gg/g7efUW9jGV
 
+**Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
+
 ## 🔥 Latest Updates
 ### May 28 2025: WanGP v5.4
 👋 World Exclusive : Hunyuan Video Avatar Support ! You won't need 80 GB of VRAM nor 32 GB oF VRAM, just 10 GB of VRAM will be sufficient to generate up to 15s of high quality speech / song driven Video at a high speed with no quality degradation. Support for TeaCache included.\
