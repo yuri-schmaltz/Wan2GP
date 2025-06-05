@@ -778,7 +778,7 @@ class HunyuanVideoAudioPipeline(DiffusionPipeline):
         # uncond_ref_latents: Union[torch.Tensor],
         pixel_value_llava: Union[torch.Tensor],                # [1, 3, 336, 336]
         uncond_pixel_value_llava: Union[torch.Tensor],
-        pixel_value_ref,
+        pixel_value_ref: Union[torch.Tensor],
         face_masks: Union[torch.Tensor],                              # [b f h w]
         audio_prompts: Union[torch.Tensor], 
         uncond_audio_prompts: Union[torch.Tensor], 

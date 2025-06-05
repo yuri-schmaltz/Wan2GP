@@ -43,7 +43,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.4.7"
-WanGP_version = "5.31"
+WanGP_version = "5.4"
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
 from importlib.metadata import version
@@ -1255,6 +1255,14 @@ def _parse_args():
         help="default denoising steps"
     )
 
+
+    parser.add_argument(
+        "--teacache",
+        type=float,
+        default=-1,
+        help="teacache speed multiplier"
+    )
+
     parser.add_argument(
         "--frames",
         type=int,
@@ -1776,6 +1784,7 @@ def get_default_settings(filename):
                 "flow_shift": 5,
                 "tea_cache_start_step_perc": 25, 
                 "video_length": 129,
+                "video_prompt_type": "I",
             })
         elif get_model_type(filename) in ("vace_14B"):
             ui_defaults.update({
@@ -2874,7 +2883,9 @@ def generate_video(
         send_cmd("output")
 
     joint_pass = boost ==1 #and profile != 1 and profile != 3  
-   # TeaCache   
+    # TeaCache
+    if args.teacache > 0:
+        tea_cache_setting = args.teacache 
     trans.enable_teacache = tea_cache_setting > 0
     if trans.enable_teacache:
         trans.teacache_multiplier = tea_cache_setting
@@ -3555,7 +3566,10 @@ def generate_preview(latents):
 
     images = torch.nn.functional.conv3d(latents, weight, bias=bias, stride=1, padding=0, dilation=1, groups=1)
     images = images.add_(1.0).mul_(127.5)
-    images = images.detach().cpu().numpy().clip(0, 255).astype(np.uint8)
+    images = images.detach().cpu()
+    if images.dtype == torch.bfloat16:
+        images = images.to(torch.float16)
+    images = images.numpy().clip(0, 255).astype(np.uint8)
     images = einops.rearrange(images, 'b c t h w -> (b h) (t w) c')
     h, w, _ = images.shape
     scale = 200 / h
@@ -5516,10 +5530,13 @@ def generate_about_tab():
     gr.Markdown("Many thanks to:")
     gr.Markdown("- <B>Alibaba Wan team for the best open source video generator")
     gr.Markdown("- <B>Alibaba Vace and Fun Teams for their incredible control net models")
+    gr.Markdown("- <B>Tencent for the impressive Hunyuan Video models")
+    gr.Markdown("- <B>Lightricks for the super fast LTX Video models")
     gr.Markdown("- <B>Cocktail Peanuts</B> : QA and simple installation via Pinokio.computer")
     gr.Markdown("- <B>Tophness</B> : created (former) multi tabs and queuing frameworks")
     gr.Markdown("- <B>AmericanPresidentJimmyCarter</B> : added original support for Skip Layer Guidance")
     gr.Markdown("- <B>Remade_AI</B> : for their awesome Loras collection")
+    gr.Markdown("- <B>Reevoy24</B> : for his repackaging / completing the documentation")
     gr.Markdown("<BR>Huge acknowlegments to these great open source projects used in WanGP:")
     gr.Markdown("- <B>Rife</B>: temporal upsampler (https://github.com/hzwer/ECCV2022-RIFE)")
     gr.Markdown("- <B>DwPose</B>: Open Pose extractor (https://github.com/IDEA-Research/DWPose)")
@@ -5528,14 +5545,25 @@ def generate_about_tab():
 
 
 def generate_info_tab():
-    gr.Markdown("<FONT SIZE=3>Welcome to WanGP a super fast and low VRAM AI Video Generator !</FONT>")
-    
-    gr.Markdown("The VRAM requirements will depend greatly of the resolution and the duration of the video, for instance :")
-    gr.Markdown("- 848 x 480 with a 14B model: 80 frames (5s) : 8 GB of VRAM")
-    gr.Markdown("- 848 x 480 with the 1.3B model: 80 frames (5s) : 5 GB of VRAM")
-    gr.Markdown("- 1280 x 720 with a 14B model: 80 frames (5s): 11 GB of VRAM")
-    gr.Markdown("It is not recommmended to generate a video longer than 8s (128 frames) even if there is still some VRAM left as some artifacts may appear")
-    gr.Markdown("Please note that if your turn on compilation, the first denoising step of the first video generation will be slow due to the compilation. Therefore all your tests should be done with compilation turned off.")
+
+
+    with open("docs/VACE.md", "r", encoding="utf-8") as reader:
+        vace= reader.read()
+
+    with open("docs/MODELS.md", "r", encoding="utf-8") as reader:
+        models = reader.read()
+
+    with open("docs/LORAS.md", "r", encoding="utf-8") as reader:
+        loras = reader.read()
+
+    with gr.Tabs() :
+        with gr.Tab("Models", id="models"):
+            gr.Markdown(models)
+        with gr.Tab("Loras", id="loras"):
+            gr.Markdown(loras)
+        with gr.Tab("Vace", id="vace"):
+            gr.Markdown(vace)
+
 
 
 def generate_dropdown_model_list(model_filename):
@@ -5942,7 +5970,7 @@ def create_ui():
                     (   state, loras_choices, lset_name, state,
                         video_guide, video_mask, image_refs, video_prompt_type_video_trigger, prompt_enhancer_row
                     ) = generate_video_tab(model_choice=model_choice, header=header, main = main)
-            with gr.Tab("Informations", id="info"):
+            with gr.Tab("Guides", id="info"):
                 generate_info_tab()
             with gr.Tab("Video Mask Creator", id="video_mask_creator") as video_mask_creator:
                 from preprocessing.matanyone  import app as matanyone_app
