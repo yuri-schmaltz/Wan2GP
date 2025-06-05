@@ -17,6 +17,8 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 
 **Discord Server to get Help from Other Users and show your Best Videos:** https://discord.gg/g7efUW9jGV
 
+**Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
+
 ## 🔥 Latest Updates
 ### May 28 2025: WanGP v5.41
 👋 Bonus release: Support for **AccVideo** Lora to speed up x2 Video generations in Wan models. Check the Loras documentation to get the usage instructions of AccVideo.\
