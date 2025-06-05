@@ -21,7 +21,7 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 
 
 ## 🔥 Latest News!!
-* May 26 2025: 👋 WanGP v5.31 : Added Phantom 14B, a model that you can use to transfer objects / people in the video. My preference goes to Vace that remains the king of controlnets.
+* May 28 2025: 👋 WanGP v5.31 : Added Phantom 14B, a model that you can use to transfer objects / people in the video. My preference goes to Vace that remains the king of controlnets.
 * May 26 2025: 👋 WanGP v5.3 : Happy with a Video generation and want to do more generations using the same settings but you can't remember what you did or you find it to hard to copy / paste one per one each setting from the file metadata ? Rejoice ! There are now multiple ways to turn this tedious process into a one click task: 
     - Select one Video recently generated in the Video Gallery and click *Use Selected Video Settings*
     - Click *Drop File Here*  and select a Video you saved somewhere, if the settings metadata have been saved with the Video you will be able to extract them automatically

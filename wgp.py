@@ -190,15 +190,19 @@ def process_prompt_and_add_tasks(state, model_choice):
         if  video_length > sliding_window_size:
             gr.Info(f"The Number of Frames to generate ({video_length}) is greater than the Sliding Window Size ({sliding_window_size}) , multiple Windows will be generated")
 
-    if "phantom" in model_filename or "hunyuan_video_custom" in model_filename:
+    if "phantom" in model_filename or "hunyuan_video_custom" in model_filename or "hunyuan_video_avatar" in model_filename:
         image_refs = inputs["image_refs"]
-
+        audio_guide  = inputs["audio_guide"]
         if image_refs  == None :
             gr.Info("You must provide an Image Reference") 
             return
-        if len(image_refs) > 1 and "hunyuan_video_custom" in model_filename:
-            gr.Info("Only one Image Reference (a person) is supported for the moment by Hunyuan Custom") 
+        if len(image_refs) > 1 and ("hunyuan_video_custom" in model_filename or "hunyuan_video_avatar" in model_filename):
+            gr.Info("Only one Image Reference (a person) is supported for the moment by Hunyuan Custom / Avatar") 
             return
+        if audio_guide == None and "hunyuan_video_avatar" in model_filename:
+            gr.Info("You must provide an audio file") 
+            return
+
         if any(isinstance(image[0], str) for image in image_refs) :
             gr.Info("Reference Image should be an Image") 
             return
@@ -1539,7 +1543,9 @@ wan_choices_i2v=["ckpts/wan2.1_image2video_480p_14B_mbf16.safetensors", "ckpts/w
 ltxv_choices= ["ckpts/ltxv_0.9.7_13B_dev_bf16.safetensors", "ckpts/ltxv_0.9.7_13B_dev_quanto_bf16_int8.safetensors", "ckpts/ltxv_0.9.7_13B_distilled_lora128_bf16.safetensors"]
 
 hunyuan_choices= ["ckpts/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan_video_i2v_720_bf16v2.safetensors", "ckpts/hunyuan_video_i2v_720_quanto_int8v2.safetensors",
-                 "ckpts/hunyuan_video_custom_720_bf16.safetensors", "ckpts/hunyuan_video_custom_720_quanto_bf16_int8.safetensors" ]
+                 "ckpts/hunyuan_video_custom_720_bf16.safetensors", "ckpts/hunyuan_video_custom_720_quanto_bf16_int8.safetensors",
+                 "ckpts/hunyuan_video_avatar_720_bf16.safetensors", "ckpts/hunyuan_video_avatar_720_quanto_bf16_int8.safetensors",
+                 ]
 
 transformer_choices = wan_choices_t2v + wan_choices_i2v + ltxv_choices + hunyuan_choices
 def get_dependent_models(model_filename, quantization, dtype_policy ):
@@ -1549,12 +1555,13 @@ def get_dependent_models(model_filename, quantization, dtype_policy ):
         return [get_model_filename("ltxv_13B", quantization, dtype_policy)]
     else:
         return []
-model_types = [ "t2v_1.3B", "t2v", "i2v", "i2v_720p", "flf2v_720p", "vace_1.3B","vace_14B","moviigen", "phantom_1.3B", "phantom_14B", "fantasy",  "fun_inp_1.3B", "fun_inp", "recam_1.3B",  "sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled", "hunyuan", "hunyuan_i2v", "hunyuan_custom"]
+model_types = [ "t2v_1.3B", "t2v", "i2v", "i2v_720p", "flf2v_720p", "vace_1.3B","vace_14B","moviigen", "phantom_1.3B", "phantom_14B", "fantasy",  "fun_inp_1.3B", "fun_inp", "recam_1.3B",  "sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled", "hunyuan", "hunyuan_i2v", "hunyuan_custom", "hunyuan_avatar"]
 model_signatures = {"t2v": "text2video_14B", "t2v_1.3B" : "text2video_1.3B",   "fun_inp_1.3B" : "Fun_InP_1.3B",  "fun_inp" :  "Fun_InP_14B", 
                     "i2v" : "image2video_480p", "i2v_720p" : "image2video_720p" , "vace_1.3B" : "Vace_1.3B", "vace_14B" : "Vace_14B","recam_1.3B": "recammaster_1.3B", 
                     "flf2v_720p" : "FLF2V_720p", "sky_df_1.3B" : "sky_reels2_diffusion_forcing_1.3B", "sky_df_14B" : "sky_reels2_diffusion_forcing_14B", 
                     "sky_df_720p_14B" : "sky_reels2_diffusion_forcing_720p_14B",  "moviigen" :"moviigen",
-                     "phantom_1.3B" : "phantom_1.3B", "phantom_14B" : "phantom_14B", "fantasy" : "fantasy", "ltxv_13B" : "ltxv_0.9.7_13B_dev", "ltxv_13B_distilled" : "ltxv_0.9.7_13B_distilled",  "hunyuan" : "hunyuan_video_720", "hunyuan_i2v" : "hunyuan_video_i2v_720", "hunyuan_custom" : "hunyuan_video_custom" }
+                    "phantom_1.3B" : "phantom_1.3B", "phantom_14B" : "phantom_14B", "fantasy" : "fantasy", "ltxv_13B" : "ltxv_0.9.7_13B_dev", "ltxv_13B_distilled" : "ltxv_0.9.7_13B_distilled", 
+                    "hunyuan" : "hunyuan_video_720", "hunyuan_i2v" : "hunyuan_video_i2v_720", "hunyuan_custom" : "hunyuan_video_custom", "hunyuan_avatar" : "hunyuan_video_avatar"  }
 
 
 def get_model_type(model_filename):
@@ -1639,7 +1646,10 @@ def get_model_name(model_filename, description_container = [""]):
         description = "A good looking image 2 video model, but not so good in prompt adherence."
     elif "hunyuan_video_custom" in model_filename:
         model_name = "Hunyuan Video Custom 720p 13B"
-        description = "The Hunyuan Video Custom model is proably the best model  to transfer people (only people for the momment) as it is quite good to keep their identity. However it is slow as to get good results, you need to generate 720p videos with 30 steps."
+        description = "The Hunyuan Video Custom model is probably the best model  to transfer people (only people for the momment) as it is quite good to keep their identity. However it is slow as to get good results, you need to generate 720p videos with 30 steps."
+    elif "hunyuan_video_avatar" in model_filename:
+        model_name = "Hunyuan Video Avatar 720p 13B"
+        description = "With the Hunyuan Video Avatar model you can animate a person based on the content of an audio input. Please note that the video generator works by processing 128 frames segment at a time (even if you ask less). The good news is that it will concatenate multiple segments for long video generation (max 3 segments recommended as the quality will get worse)."
     else:
         model_name = "Wan2.1 text2video"
         model_name += " 14B" if "14B" in model_filename else " 1.3B"
@@ -1758,7 +1768,14 @@ def get_default_settings(filename):
             ui_defaults.update({
                 "guidance_scale": 7.5,
                 "flow_shift": 13,
-                "resolution": "1280x720" 
+                "resolution": "1280x720",
+            })
+        elif get_model_type(filename) in ("hunyuan_avatar"):
+            ui_defaults.update({
+                "guidance_scale": 7.5,
+                "flow_shift": 5,
+                "tea_cache_start_step_perc": 25, 
+                "video_length": 129,
             })
         elif get_model_type(filename) in ("vace_14B"):
             ui_defaults.update({
@@ -1954,8 +1971,13 @@ def download_models(transformer_filename):
         text_encoder_filename = get_hunyuan_text_encoder_filename(text_encoder_quantization)    
         model_def = {  
             "repoId" : "DeepBeepMeep/HunyuanVideo", 
-            "sourceFolderList" :  [ "llava-llama-3-8b", "clip_vit_large_patch14", ""  ],
-            "fileList" :[ ["config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "preprocessor_config.json"] + computeList(text_encoder_filename) , ["config.json", "merges.txt", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "vocab.json"],  [ "hunyuan_video_720_quanto_int8_map.json", "hunyuan_video_custom_VAE_fp32.safetensors", "hunyuan_video_custom_VAE_config.json", "hunyuan_video_VAE_fp32.safetensors", "hunyuan_video_VAE_config.json" , "hunyuan_video_720_quanto_int8_map.json"   ] + computeList(transformer_filename)  ]
+            "sourceFolderList" :  [ "llava-llama-3-8b", "clip_vit_large_patch14",  "whisper-tiny" , "det_align", ""  ],
+            "fileList" :[ ["config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "preprocessor_config.json"] + computeList(text_encoder_filename) ,
+                          ["config.json", "merges.txt", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "vocab.json"],
+                          ["config.json", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer_config.json"],
+                          ["detface.pt"],
+                          [ "hunyuan_video_720_quanto_int8_map.json", "hunyuan_video_custom_VAE_fp32.safetensors", "hunyuan_video_custom_VAE_config.json", "hunyuan_video_VAE_fp32.safetensors", "hunyuan_video_VAE_config.json" , "hunyuan_video_720_quanto_int8_map.json"   ] + computeList(transformer_filename)  
+                         ]
         } 
 
     else:
@@ -2121,6 +2143,14 @@ def load_hunyuan_model(model_filename, quantizeTransformer = False, dtype = torc
     )
 
     pipe = { "transformer" : hunyuan_model.model, "text_encoder" : hunyuan_model.text_encoder, "text_encoder_2" : hunyuan_model.text_encoder_2, "vae" : hunyuan_model.vae  }
+
+    if hunyuan_model.wav2vec != None:
+        pipe["wav2vec"] = hunyuan_model.wav2vec
+
+
+    # if hunyuan_model.align_instance != None:
+    #     pipe["align_instance"] = hunyuan_model.align_instance.facedet.model
+
 
     from hyvideo.modules.models import get_linear_split_map
 
@@ -2818,9 +2848,13 @@ def generate_video(
     hunyuan_t2v = "hunyuan_video_720" in model_filename
     hunyuan_i2v = "hunyuan_video_i2v" in model_filename
     hunyuan_custom = "hunyuan_video_custom" in model_filename
+    hunyuan_avatar = "hunyuan_video_avatar" in model_filename
+    fantasy = "fantasy" in model_filename
     if diffusion_forcing or hunyuan_t2v or hunyuan_i2v or hunyuan_custom:
         fps = 24
-    elif audio_guide != None:
+    elif hunyuan_avatar:
+        fps = 25
+    elif fantasy:
         fps = 23
     elif ltxv:
         fps = 30
@@ -2829,11 +2863,13 @@ def generate_video(
     latent_size = 8 if ltxv else 4
 
     original_image_refs = image_refs 
-    if image_refs != None and len(image_refs) > 0 and (hunyuan_custom or phantom or vace):
-        send_cmd("progress", [0, get_latest_status(state, "Removing Images References Background")])
+    if image_refs != None and len(image_refs) > 0 and (hunyuan_custom or phantom or hunyuan_avatar or vace):
+        if hunyuan_avatar: remove_background_images_ref = 0
+        if remove_background_images_ref > 0:
+            send_cmd("progress", [0, get_latest_status(state, "Removing Images References Background")])
         os.environ["U2NET_HOME"] = os.path.join(os.getcwd(), "ckpts", "rembg")
         from wan.utils.utils import resize_and_remove_background
-        image_refs = resize_and_remove_background(image_refs, width, height, remove_background_images_ref, fit_into_canvas= not vace)
+        image_refs = resize_and_remove_background(image_refs, width, height, remove_background_images_ref, fit_into_canvas= not (vace or hunyuan_avatar) ) # no fit for vace ref images as it is done later
         update_task_thumbnails(task, locals())
         send_cmd("output")
 
@@ -2866,13 +2902,14 @@ def generate_video(
     audio_proj_split = None
     audio_scale = None
     audio_context_lens = None
-    if audio_guide != None:
+    if (fantasy or hunyuan_avatar) and audio_guide != None:
         from fantasytalking.infer import parse_audio
         import librosa
         duration = librosa.get_duration(path=audio_guide)
-        current_video_length = min(int(fps * duration // 4) * 4 + 5, current_video_length)    
-        audio_proj_split, audio_context_lens = parse_audio(audio_guide, num_frames= current_video_length, fps= fps, device= processing_device  )
-        audio_scale = 1.0
+        current_video_length = min(int(fps * duration // 4) * 4 + 5, current_video_length)
+        if fantasy:
+            audio_proj_split, audio_context_lens = parse_audio(audio_guide, num_frames= current_video_length, fps= fps, device= processing_device  )
+            audio_scale = 1.0
 
     import random
     if seed == None or seed <0:
@@ -2990,7 +3027,7 @@ def generate_video(
             if reuse_frames > 0:                
                 return_latent_slice = slice(-(reuse_frames - 1 + discard_last_frames ) // latent_size, None if discard_last_frames == 0 else -(discard_last_frames // latent_size) )
 
-            if hunyuan_custom:
+            if hunyuan_custom or hunyuan_avatar:
                 src_ref_images  = image_refs
             elif phantom:
                 src_ref_images = image_refs.copy() if image_refs != None else None
@@ -3098,6 +3135,7 @@ def generate_video(
                     cfg_star_switch = cfg_star_switch,
                     cfg_zero_step = cfg_zero_step,
                     audio_cfg_scale= audio_guidance_scale,
+                    audio_guide=audio_guide,
                     audio_proj= audio_proj_split,
                     audio_scale= audio_scale,
                     audio_context_lens= audio_context_lens,
@@ -4502,6 +4540,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             hunyuan_t2v = "hunyuan_video_720" in model_filename
             hunyuan_i2v = "hunyuan_video_i2v" in model_filename
             hunyuan_video_custom = "hunyuan_video_custom" in model_filename
+            hunyuan_video_avatar = "hunyuan_video_avatar" in model_filename
             sliding_window_enabled = vace or diffusion_forcing or ltxv
             new_line_text = "each new line of prompt will be used for a window" if sliding_window_enabled else "each new line of prompt will generate a new video"
 
@@ -4575,7 +4614,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     model_mode = gr.Dropdown(value=None, visible=False)
                     keep_frames_video_source = gr.Text(visible=False)
 
-            with gr.Column(visible= vace or phantom or hunyuan_video_custom) as video_prompt_column: 
+            with gr.Column(visible= vace or phantom or hunyuan_video_custom or hunyuan_video_avatar) as video_prompt_column: 
                 video_prompt_type_value= ui_defaults.get("video_prompt_type","")
                 video_prompt_type = gr.Text(value= video_prompt_type_value, visible= False)
                 with gr.Row():
@@ -4624,14 +4663,14 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         ("Keep it for first Image (landscape) and remove it for other Images (objects / faces)", 2),
                     ],
                     value=ui_defaults.get("remove_background_images_ref",1),
-                    label="Remove Background of Images References", scale = 3, visible= "I" in video_prompt_type_value
+                    label="Remove Background of Images References", scale = 3, visible= "I" in video_prompt_type_value and not hunyuan_video_avatar
                 )
 
                 # remove_background_images_ref = gr.Checkbox(value=ui_defaults.get("remove_background_images_ref",1), label= "Remove Background of Images References", visible= "I" in video_prompt_type_value, scale =1 ) 
 
 
                 video_mask = gr.Video(label= "Video Mask (for Inpainting or Outpaing, white pixels = Mask)", visible= "M" in video_prompt_type_value, value= ui_defaults.get("video_mask", None)) 
-            audio_guide = gr.Audio(value= ui_defaults.get("audio_guide", None), type="filepath", label="Voice to follow", show_download_button= True, visible= fantasy )
+            audio_guide = gr.Audio(value= ui_defaults.get("audio_guide", None), type="filepath", label="Voice to follow", show_download_button= True, visible= fantasy or hunyuan_video_avatar )
 
             advanced_prompt = advanced_ui
             prompt_vars=[]
@@ -4720,6 +4759,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     video_length = gr.Slider(17, 737, value=ui_defaults.get("video_length", 81), step=4, label="Number of frames (16 = 1s)", interactive= True)
                 elif fantasy:
                     video_length = gr.Slider(5, 233, value=ui_defaults.get("video_length", 81), step=4, label="Number of frames (23 = 1s)", interactive= True)
+                elif hunyuan_video_avatar:
+                    video_length = gr.Slider(5, 401, value=ui_defaults.get("video_length", 81), step=4, label="Number of frames (25 = 1s)", interactive= True)
                 elif hunyuan_t2v or hunyuan_i2v:
                     video_length = gr.Slider(5, 337, value=ui_defaults.get("video_length", 97), step=4, label="Number of frames (24 = 1s)", interactive= True)
                 else:
@@ -4809,7 +4850,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         )
 
                 with gr.Tab("Quality", visible = not ltxv) as quality_tab:
-                        with gr.Column(visible = not (hunyuan_i2v or hunyuan_t2v or hunyuan_video_custom) ) as skip_layer_guidance_row:
+                        with gr.Column(visible = not (hunyuan_i2v or hunyuan_t2v or hunyuan_video_custom or hunyuan_video_avatar) ) as skip_layer_guidance_row:
                             gr.Markdown("<B>Skip Layer Guidance (improves video quality)</B>")
                             with gr.Row():
                                 slg_switch = gr.Dropdown(
