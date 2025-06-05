@@ -88,7 +88,7 @@ python wgp.py --lora-preset mypreset.lset
 - Presets include comments with usage instructions
 - Share `.lset` files with other users
 
-## CausVid Lora (Special)
+## CausVid Lora (Video Generation Accelerator)
 
 CausVid is a distilled Wan model that generates videos in 4-12 steps with 2x speed improvement.
 
@@ -124,6 +124,33 @@ WanGP supports multiple lora formats:
 - **Safetensors** (.safetensors)
 - **Replicate** format
 - **Standard PyTorch** (.pt, .pth)
+
+## AccVid Lora (Video Generation Accelerator)
+
+AccVid is a distilled Wan model that generates videos with a 2x speed improvement since classifier free guidance is no longer needed (that is cfg = 1).
+
+### Setup Instructions
+1. Download the CausVid Lora:
+
+- for t2v models:
+   ```
+   https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_AccVid_T2V_14B_lora_rank32_fp16.safetensors
+   ```
+
+- for i2v models:
+   ```
+   https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_AccVid_I2V_480P_14B_lora_rank32_fp16.safetensors
+   ```
+
+2. Place in your `loras/` directory or `loras_i2v/` directory
+
+### Usage
+1. Select a Wan t2v model (e.g., Wan 2.1 text2video 13B or Vace 13B) or Wan i2v model
+2. Enable Advanced Mode
+3. In Advanced Generation Tab:
+   - Set Guidance Scale = 1
+   - Set Shift Scale = 5
+4. The number steps remain unchanged compared to what you would use with the original model but it will be two times faster since classifier free guidance is not needed
 
 ## Performance Tips
 

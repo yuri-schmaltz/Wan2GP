@@ -18,12 +18,16 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Discord Server to get Help from Other Users and show your Best Videos:** https://discord.gg/g7efUW9jGV
 
 ## 🔥 Latest Updates
+### May 28 2025: WanGP v5.41
+👋 Bonus release: Support for **AccVideo** Lora to speed up x2 Video generations in Wan models. Check the Loras documentation to get the usage instructions of AccVideo.\
+You will need to do a *pip install -r requirements.txt*
+
 ### May 28 2025: WanGP v5.4
-👋 World Exclusive : Hunyuan Video Avatar Support ! You won't need 80 GB of VRAM nor 32 GB oF VRAM, just 10 GB of VRAM will be sufficient to generate up to 15s of high quality speech / song driven Video at a high speed with no quality degradation. Support for TeaCache included.\
+👋 World Exclusive : **Hunyuan Video Avatar** Support ! You won't need 80 GB of VRAM nor 32 GB oF VRAM, just 10 GB of VRAM will be sufficient to generate up to 15s of high quality speech / song driven Video at a high speed with no quality degradation. Support for TeaCache included.\
 Also many thanks to Reevoy24 for his repackaging / completing the documentation
 
 ### May 28 2025: WanGP v5.31
-👋 Added Phantom 14B, a model that you can use to transfer objects / people in the video. My preference goes to Vace that remains the king of controlnets.
+👋 Added **Phantom 14B**, a model that you can use to transfer objects / people in the video. My preference goes to Vace that remains the king of controlnets.
 VACE improvements: Better sliding window transitions, image mask support in Matanyone, new Extend Video feature, and enhanced background removal options.
 
 ### May 26, 2025: WanGP v5.3
@@ -33,7 +37,7 @@ VACE improvements: Better sliding window transitions, image mask support in Mata
 - Export/import settings as JSON files for easy sharing and backup
 
 ### May 20, 2025: WanGP v5.2
-👋 **CausVid support** - Generate videos in just 4-12 steps with the new distilled Wan model! Also added experimental MoviiGen for 1080p generation (20GB+ VRAM required).
+👋 **CausVid support** - Generate videos in just 4-12 steps with the new distilled Wan model! Also added experimental MoviiGen for 1080p generation (20GB+ VRAM required). Check the Loras documentation to get the usage instructions of CausVid.
 
 ### May 18, 2025: WanGP v5.1
 👋 **LTX Video 13B Distilled** - Generate high-quality videos in less than one minute!
