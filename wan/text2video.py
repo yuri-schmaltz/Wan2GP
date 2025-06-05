@@ -82,9 +82,9 @@ class WanT2V:
         from mmgp import offload
         # model_filename = "c:/temp/vace1.3/diffusion_pytorch_model.safetensors"
         # model_filename = "vace14B_quanto_bf16_int8.safetensors"
-        # model_filename = "c:/temp/movii/diffusion_pytorch_model-00001-of-00007.safetensors"
-        # config_filename= "c:/temp/movii/config.json"
-        self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer, writable_tensors= False) # , forcedConfigPath= config_filename)
+        # model_filename = "c:/temp/phantom/Phantom_Wan_14B-00001-of-00006.safetensors"
+        # config_filename= "c:/temp/phantom/config.json"
+        self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer, writable_tensors= False)#, forcedConfigPath= config_filename)
         # offload.load_model_data(self.model, "e:/vace.safetensors")
         # offload.load_model_data(self.model, "c:/temp/Phantom-Wan-1.3B.pth")
         # self.model.to(torch.bfloat16)
@@ -92,8 +92,8 @@ class WanT2V:
         self.model.lock_layers_dtypes(torch.float32 if mixed_precision_transformer else dtype)
         # dtype = torch.bfloat16
         offload.change_dtype(self.model, dtype, True)
-        # offload.save_model(self.model, "wan2.1_moviigen_14B_mbf16.safetensors", config_file_path=config_filename)
-        # offload.save_model(self.model, "wan2.1_moviigen_14B_quanto_fp16_int8.safetensors", do_quantize= True, config_file_path=config_filename)
+        # offload.save_model(self.model, "wan2.1_phantom_14B_mbf16.safetensors", config_file_path=config_filename)
+        # offload.save_model(self.model, "wan2.1_phantom_14B_quanto_fp16_int8.safetensors", do_quantize= True, config_file_path=config_filename)
         self.model.eval().requires_grad_(False)
 
 
@@ -477,7 +477,7 @@ class WanT2V:
                 pass
                 overlap_noise_factor = overlap_noise / 1000 
                 latents[:, conditioning_latents_size + ref_images_count:]   = latents[:, conditioning_latents_size + ref_images_count:]  * (1.0 - overlap_noise_factor) + torch.randn_like(latents[:, conditioning_latents_size + ref_images_count:]) * overlap_noise_factor 
-                timestep = [torch.tensor([t.item()] * (conditioning_latents_size + ref_images_count) + [t.item() - overlap_noise]*(len(timesteps) - conditioning_latents_size - ref_images_count))]
+                #timestep = [torch.tensor([t.item()] * (conditioning_latents_size + ref_images_count) + [t.item() - overlap_noise]*(len(timesteps) - conditioning_latents_size - ref_images_count))]
 
             if target_camera != None:
                 latent_model_input = torch.cat([latents, source_latents], dim=1)

@@ -18,23 +18,23 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Discord Server to get Help from Other Users and show your Best Videos:** https://discord.gg/g7efUW9jGV
 
 ## 🔥 Latest Updates
+### May 28 2025: WanGP v5.31
+👋 Added Phantom 14B, a model that you can use to transfer objects / people in the video. My preference goes to Vace that remains the king of controlnets.
+VACE improvements: Better sliding window transitions, image mask support in Matanyone, new Extend Video feature, and enhanced background removal options.
 
-### May 26, 2025: Wan 2.1GP v5.3
+### May 26, 2025: WanGP v5.3
 👋 Settings management revolution! Now you can:
 - Select any generated video and click *Use Selected Video Settings* to instantly reuse its configuration
 - Drag & drop videos to automatically extract their settings metadata
 - Export/import settings as JSON files for easy sharing and backup
 
-### May 23, 2025: Wan 2.1GP v5.21
-👋 VACE improvements: Better sliding window transitions, image mask support in Matanyone, new Extend Video feature, and enhanced background removal options.
-
-### May 20, 2025: Wan 2.1GP v5.2
+### May 20, 2025: WanGP v5.2
 👋 **CausVid support** - Generate videos in just 4-12 steps with the new distilled Wan model! Also added experimental MoviiGen for 1080p generation (20GB+ VRAM required).
 
-### May 18, 2025: Wan 2.1GP v5.1
+### May 18, 2025: WanGP v5.1
 👋 **LTX Video 13B Distilled** - Generate high-quality videos in less than one minute!
 
-### May 17, 2025: Wan 2.1GP v5.0
+### May 17, 2025: WanGP v5.0
 👋 **One App to Rule Them All!** Added Hunyuan Video and LTX Video support, plus Vace 14B and integrated prompt enhancer.
 
 See full changelog: **[Changelog](docs/CHANGELOG.md)**
