@@ -42,8 +42,8 @@ global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
-target_mmgp_version = "3.4.7"
-WanGP_version = "5.4"
+target_mmgp_version = "3.4.8"
+WanGP_version = "5.41"
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
 from importlib.metadata import version
@@ -3263,11 +3263,13 @@ def generate_video(
                 if exp > 0: 
                     from rife.inference import temporal_interpolation
                     if sliding_window and window_no > 1:
-                        sample = torch.cat([frames_already_processed[:, -2:-1], sample], dim=1)
+                        sample = torch.cat([previous_before_last_frame, sample], dim=1)
+                        previous_before_last_frame = sample[:, -2:-1].clone()
                         sample = temporal_interpolation( os.path.join("ckpts", "flownet.pkl"), sample, exp, device=processing_device)
                         sample = sample[:, 1:]
                     else:
                         sample = temporal_interpolation( os.path.join("ckpts", "flownet.pkl"), sample, exp, device=processing_device)
+                        previous_before_last_frame = sample[:, -2:-1].clone()
 
                     output_fps = output_fps * 2**exp
 
@@ -4843,8 +4845,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         temporal_upsampling = gr.Dropdown(
                             choices=[
                                 ("Disabled", ""),
-                                ("Rife x2 (32 frames/s)", "rife2"), 
-                                ("Rife x4 (64 frames/s)", "rife4"), 
+                                ("Rife x2 frames/s", "rife2"), 
+                                ("Rife x4 frames/s", "rife4"), 
                             ],
                             value=ui_defaults.get("temporal_upsampling", ""),
                             visible=True,
