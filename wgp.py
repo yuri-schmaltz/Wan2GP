@@ -3263,13 +3263,13 @@ def generate_video(
                 if exp > 0: 
                     from rife.inference import temporal_interpolation
                     if sliding_window and window_no > 1:
-                        sample = torch.cat([previous_before_last_frame, sample], dim=1)
-                        previous_before_last_frame = sample[:, -2:-1].clone()
+                        sample = torch.cat([previous_last_frame, sample], dim=1)
+                        previous_last_frame = sample[:, -1:].clone()
                         sample = temporal_interpolation( os.path.join("ckpts", "flownet.pkl"), sample, exp, device=processing_device)
                         sample = sample[:, 1:]
                     else:
                         sample = temporal_interpolation( os.path.join("ckpts", "flownet.pkl"), sample, exp, device=processing_device)
-                        previous_before_last_frame = sample[:, -2:-1].clone()
+                        previous_last_frame = sample[:, -1:].clone()
 
                     output_fps = output_fps * 2**exp
 

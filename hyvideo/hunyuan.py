@@ -867,6 +867,9 @@ class HunyuanVideoSampler(Inference):
             if self.avatar:
                 w, h = input_ref_images.size
                 target_height, target_width = calculate_new_dimensions(target_height, target_width, h, w, fit_into_canvas)
+                if target_width != w or target_height != h:
+                    input_ref_images = input_ref_images.resize((target_width,target_height), resample=Image.Resampling.LANCZOS) 
+
                 concat_dict = {'mode': 'timecat', 'bias': -1} 
                 freqs_cos, freqs_sin = self.get_rotary_pos_embed_new(129, target_height, target_width, concat_dict)
             else:
