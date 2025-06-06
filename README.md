@@ -26,6 +26,7 @@ You will need to do a *pip install -r requirements.txt*
 
 ### May 28 2025: WanGP v5.4
 👋 World Exclusive : **Hunyuan Video Avatar** Support ! You won't need 80 GB of VRAM nor 32 GB oF VRAM, just 10 GB of VRAM will be sufficient to generate up to 15s of high quality speech / song driven Video at a high speed with no quality degradation. Support for TeaCache included.\
+Here is a link to the original repo where you will find some very interesting documentation and examples. https://github.com/Tencent-Hunyuan/HunyuanVideo-Avatar. Kudos to the Hunyuan Video Avatar team for the best model of its kind.\
 Also many thanks to Reevoy24 for his repackaging / completing the documentation
 
 ### May 28 2025: WanGP v5.31
