@@ -14,6 +14,7 @@ import gradio as gr
 import random
 import json
 import wan
+import notification_sound
 from wan.configs import MAX_AREA_CONFIGS, WAN_CONFIGS, SUPPORTED_SIZES, VACE_SIZE_CONFIGS
 from wan.utils.utils import cache_video
 from wan.modules.attention import get_attention_modes, get_supported_attention_modes
@@ -2334,7 +2335,9 @@ def apply_changes(  state,
                     UI_theme_choice = "default",
                     enhancer_enabled_choice = 0,
                     fit_canvas_choice = 0,
-                    preload_in_VRAM_choice = 0
+                    preload_in_VRAM_choice = 0,
+                    notification_sound_enabled_choice = 1,
+                    notification_sound_volume_choice = 50
 ):
     if args.lock_config:
         return
@@ -2359,7 +2362,9 @@ def apply_changes(  state,
                      "UI_theme" : UI_theme_choice,
                      "fit_canvas": fit_canvas_choice,
                      "enhancer_enabled" : enhancer_enabled_choice,
-                     "preload_in_VRAM" : preload_in_VRAM_choice
+                     "preload_in_VRAM" : preload_in_VRAM_choice,
+                     "notification_sound_enabled" : notification_sound_enabled_choice,
+                     "notification_sound_volume" : notification_sound_volume_choice
                        }
 
     if Path(server_config_filename).is_file():
@@ -2396,7 +2401,7 @@ def apply_changes(  state,
     transformer_types = server_config["transformer_types"]
     model_filename = get_model_filename(get_model_type(state["model_filename"]), transformer_quantization, transformer_dtype_policy)
     state["model_filename"] = model_filename
-    if all(change in ["attention_mode", "vae_config", "boost", "save_path", "metadata_type", "clear_file_list", "fit_canvas"] for change in changes ):
+    if all(change in ["attention_mode", "vae_config", "boost", "save_path", "metadata_type", "clear_file_list", "fit_canvas", "notification_sound_enabled", "notification_sound_volume"] for change in changes ):
         model_choice = gr.Dropdown()
     else:
         reload_needed = True
@@ -3450,6 +3455,17 @@ def generate_video(
                 print(f"New video saved to Path: "+video_path)
                 file_list.append(video_path)
                 file_settings_list.append(configs)
+                
+                # Play notification sound for single video
+                try:
+                    if server_config.get("notification_sound_enabled", 1):
+                        volume = server_config.get("notification_sound_volume", 50)
+                        notification_sound.notify_video_completion(
+                            video_path=video_path, 
+                            volume=volume
+                        )
+                except Exception as e:
+                    print(f"Error playing notification sound for individual video: {e}")
 
                 send_cmd("output")
 
@@ -3793,6 +3809,13 @@ def process_tasks(state):
         status = f"Video generation was aborted. Total Generation Time: {end_time-start_time:.1f}s" 
     else:
         status = f"Total Generation Time: {end_time-start_time:.1f}s" 
+        # Play notification sound when video generation completed successfully
+        try:
+            if server_config.get("notification_sound_enabled", 1):
+                volume = server_config.get("notification_sound_volume", 50)
+                notification_sound.notify_video_completion(volume=volume)
+        except Exception as e:
+            print(f"Error playing notification sound: {e}")
     gen["status"] = status
     gen["status_display"] =  False
 
@@ -5617,7 +5640,24 @@ def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhan
                 )
                 preload_in_VRAM_choice = gr.Slider(0, 40000, value=server_config.get("preload_in_VRAM", 0), step=100, label="Number of MB of Models that are Preloaded in VRAM (0 will use Profile default)")
 
+            with gr.Tab("Notifications"):
+                gr.Markdown("### Notification Settings")
+                notification_sound_enabled_choice = gr.Dropdown(
+                    choices=[
+                        ("On", 1),
+                        ("Off", 0),
+                    ],
+                    value=server_config.get("notification_sound_enabled", 1),
+                    label="Notification Sound Enabled"
+                )
 
+                notification_sound_volume_choice = gr.Slider(
+                    minimum=0,
+                    maximum=100,
+                    value=server_config.get("notification_sound_volume", 50),
+                    step=5,
+                    label="Notification Sound Volume (0 = silent, 100 = very loud)"
+                )
 
         
         msg = gr.Markdown()            
@@ -5644,7 +5684,9 @@ def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhan
                     UI_theme_choice,
                     enhancer_enabled_choice,
                     fit_canvas_choice,
-                    preload_in_VRAM_choice
+                    preload_in_VRAM_choice,
+                    notification_sound_enabled_choice,
+                    notification_sound_volume_choice
                 ],
                 outputs= [msg , header, model_choice, prompt_enhancer_row]
         )
