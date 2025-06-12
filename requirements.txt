@@ -34,5 +34,4 @@ loguru
 sentencepiece
 av
 opencv-python
-pygame
 # rembg==2.0.65
