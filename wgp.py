@@ -2545,7 +2545,21 @@ def refresh_gallery(state): #, msg
         for img_uri in list_uri:
             thumbnails += f'<TD><img src="{img_uri}" alt="Start" style="max-width:{thumbnail_size}; max-height:{thumbnail_size}; display: block; margin: auto; object-fit: contain;" /></TD>'
         
-        html = "<STYLE> #PINFO, #PINFO  th, #PINFO td {border: 1px solid #CCCCCC;background-color:#FFFFFF;}</STYLE><TABLE WIDTH=100% ID=PINFO ><TR><TD width=100%>" + prompt + "</TD>" + thumbnails + "</TR></TABLE>" 
+        # Get current theme from server config  
+        current_theme = server_config.get("UI_theme", "default")
+        
+        # Use minimal, adaptive styling that blends with any background
+        # This creates a subtle container that doesn't interfere with the page's theme
+        table_style = """
+            border: 1px solid rgba(128, 128, 128, 0.3); 
+            background-color: transparent; 
+            color: inherit; 
+            padding: 8px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        """
+        
+        html = f"<TABLE WIDTH=100% ID=PINFO style='{table_style}'><TR><TD width=100% style='{table_style}'>" + prompt + "</TD>" + thumbnails + "</TR></TABLE>" 
         html_output = gr.HTML(html, visible= True)
         return gr.Gallery(selected_index=choice, value = file_list), html_output, gr.Button(visible=False), gr.Button(visible=True), gr.Row(visible=True), update_queue_data(queue), gr.Button(interactive=  abort_interactive), gr.Button(visible= onemorewindow_visible)
 
