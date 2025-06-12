@@ -25,8 +25,8 @@ Here are steps:
 3) Save this file in the subfolder **finetunes**. The name used for the file will be used as its id. It is a good practise to prefix the name of this file with the base model. For instance for a finetune named **Fast*** based on  Hunyuan Text 2 Video model *hunyuan_t2v_fast.json*. In this example the Id is *hunyuan_t2v_fast*.
 4) Restart WanGP
 
-## Base Models Ids
-A finetune is derived from a base model and will inherit all the user interface and corresponding model capabilities, here are the Ids:
+## Architecture Models Ids
+A finetune is derived from a base model and will inherit all the user interface and corresponding model capabilities, here are Architecture Ids:
 - *t2v*: Wan 2.1 Video text 2 
 - *i2v*: Wan 2.1 Video image 2 480p
 - *i2v_720p*: Wan 2.1 Video image 2 720p
@@ -36,9 +36,10 @@ A finetune is derived from a base model and will inherit all the user interface 
 
 ## The Model Subtree
 - *name* : name of the finetune used to select
-- *base* : Id of the base model of the finetune (see previous section)
+- *architecture* : architecture Id of the base model of the finetune (see previous section)
 - *description*: description of the finetune that will appear at the top
 - *URLs*: URLs of all the finetune versions (quantized / non quantized). WanGP will pick the version that is the closest to the user preferences. You will need to follow a naming convention to help WanGP identify the content of each version (see next section). Right now WanGP supports only 8 bits quantized model that have been quantized using **quanto**. WanGP offers a command switch to build easily such a quantized model (see below). *URLs* can contain also paths to local file to allow testing.
+- *modules*: this a list of modules to be combined with the models referenced by the URLs. A module is a model extension that is merged with a model to expand its capabilities. So far the only module supported is Vace 14B  (its id is *vace_14B*). For instance the full Vace model is the fusion of a Wan text 2 video and the Vace module.
 - *preload_URLs* : URLs of files to download no matter what (used to load quantization maps for instance)
 - *auto_quantize*: if set to True and no quantized model URL is provided, WanGP will perform on the fly quantization if the user expects a quantized model
 
@@ -47,7 +48,7 @@ Example of **model** subtree
 	"model":
 	{
 		"name": "Wan text2video FusioniX 14B",
-		"base" : "t2v",
+		"architecture" : "t2v",
 		"description": "A powerful merged text-to-video model based on the original WAN 2.1 T2V model, enhanced using multiple open-source components and LoRAs to boost motion realism, temporal consistency, and expressive detail. multiple open-source models and LoRAs to boost temporal quality, expressiveness, and motion realism.",
 		"URLs": [
 			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/Wan14BT2VFusioniX_fp16.safetensors",

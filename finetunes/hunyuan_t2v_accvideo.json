@@ -1,7 +1,7 @@
 {
   "model": {
     "name": "Hunyuan AccVideo 720p 13B",
-    "base": "hunyuan",
+    "architecture": "hunyuan",
     "description": " AccVideo is a novel efficient distillation method to accelerate video diffusion models with synthetic datset. Our method is 8.5x faster than HunyuanVideo.",
     "URLs": [
       "https://huggingface.co/DeepBeepMeep/HunyuanVideo/resolve/main/accvideo_hunyuan_video_720_quanto_int8.safetensors"

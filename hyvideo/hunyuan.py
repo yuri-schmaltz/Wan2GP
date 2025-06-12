@@ -387,7 +387,7 @@ class Inference(object):
         # model = Inference.load_state_dict(args, model, model_filepath)
 
         # model_filepath ="c:/temp/hc/mp_rank_00_model_states_video.pt"
-        offload.load_model_data(model, model_filepath, quantizeTransformer = quantizeTransformer and not save_quantized, pinToMemory = pinToMemory, partialPinning = partialPinning)
+        offload.load_model_data(model, model_filepath, do_quantize= quantizeTransformer and not save_quantized, pinToMemory = pinToMemory, partialPinning = partialPinning)
         pass
         # offload.save_model(model, "hunyuan_video_avatar_edit_720_bf16.safetensors")
         # offload.save_model(model, "hunyuan_video_avatar_edit_720_quanto_bf16_int8.safetensors", do_quantize= True)

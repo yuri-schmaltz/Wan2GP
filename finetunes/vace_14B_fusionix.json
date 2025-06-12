@@ -2,12 +2,13 @@
 	"model":
 	{
 		"name": "Vace FusioniX 14B",
-		"base" : "vace_14B",
+		"architecture" : "vace_14B",
+		"modules" : ["vace_14B"],		
 		"description": "Vace control model enhanced using multiple open-source components and LoRAs to boost motion realism, temporal consistency, and expressive detail.",
 		"URLs": [
-			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/wan2.1_Vace_FusioniX_14B_mfp16.safetensors",
-			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/wan2.1_Vace_FusioniX_14B_quanto_mfp16_int8.safetensors",
-			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/wan2.1_Vace_FusioniX_14B_quanto_mbf16_int8.safetensors"
+			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/Wan14BT2VFusioniX_fp16.safetensors",
+			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/Wan14BT2VFusioniX_quanto_fp16_int8.safetensors",
+			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/Wan14BT2VFusioniX_quanto_bf16_int8.safetensors"
 		],
 		"auto_quantize": true
 	},

@@ -84,10 +84,11 @@ class WanT2V:
         from mmgp import offload
         # model_filename = "c:/temp/vace1.3/diffusion_pytorch_model.safetensors"
         # model_filename = "Vacefusionix_quanto_fp16_int8.safetensors"
-        # model_filename = "c:/temp/phantom/Phantom_Wan_14B-00001-of-00006.safetensors"
-        # config_filename= "c:/temp/phantom/config.json"
+        # model_filename = "c:/temp/t2v/diffusion_pytorch_model-00001-of-00006.safetensors"
+        # config_filename= "c:/temp/t2v/t2v.json"
         base_config_file = f"configs/{base_model_type}.json"
-        self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer and not save_quantized, writable_tensors= False, defaultConfigPath=base_config_file)#, forcedConfigPath= config_filename)
+        forcedConfigPath = base_config_file if len(model_filename) > 1 else None
+        self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer and not save_quantized, writable_tensors= False, defaultConfigPath=base_config_file , forcedConfigPath= forcedConfigPath)
         # offload.load_model_data(self.model, "c:/temp/Phantom-Wan-1.3B.pth")
         # self.model.to(torch.bfloat16)
         # self.model.cpu()
@@ -95,8 +96,8 @@ class WanT2V:
         # dtype = torch.bfloat16
         # offload.load_model_data(self.model, "ckpts/Wan14BT2VFusioniX_fp16.safetensors")
         offload.change_dtype(self.model, dtype, True)
-        # offload.save_model(self.model, "wanfusionix_fp16.safetensors", config_file_path=base_config_file)
-        # offload.save_model(self.model, "wanfusionix_quanto_fp16_int8.safetensors", do_quantize=True, config_file_path=base_config_file)
+        # offload.save_model(self.model, "wan2.1_text2video_14B_mbf16.safetensors", config_file_path=base_config_file)
+        # offload.save_model(self.model, "wan2.1_text2video_14B_quanto_mfp16_int8.safetensors", do_quantize=True, config_file_path=base_config_file)
         self.model.eval().requires_grad_(False)
         if save_quantized:            
             from wan.utils.utils import save_quantized_model

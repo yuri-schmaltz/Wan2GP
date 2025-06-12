@@ -64,7 +64,8 @@ class DTT2V:
         # model_filename = "model.safetensors"
         # model_filename = "c:/temp/diffusion_pytorch_model-00001-of-00006.safetensors"
         base_config_file = f"configs/{base_model_type}.json"
-        self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer, writable_tensors= False) # , forcedConfigPath="c:/temp/config _df720.json")
+        forcedConfigPath = base_config_file if len(model_filename) > 1 else None
+        self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer, writable_tensors= False , forcedConfigPath=forcedConfigPath)
         # offload.load_model_data(self.model, "recam.ckpt")
         # self.model.cpu()
         # dtype = torch.float16
