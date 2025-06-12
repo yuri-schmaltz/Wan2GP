@@ -21,7 +21,7 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 
 ## 🔥 Latest Updates
 ### June 12 2025: WanGP v6.0
-👋 *Finetune models*: You find the 20 models supported by WanGP not sufficient ? Too impatient to wait for the next release to get the support for a newly released model ? Your prayers have been answered: if a new model is compatible with a model architecture supported by WanGP, you can add ny yourself the support for this model in WanGP by just creating a finetune model definition. You can then store this model in the cloud (for instance in Huggingface) and the very light finetune definition file can be easily shared with other users. WanGP will download automatically the finetuned model for them.
+👋 *Finetune models*: You find the 20 models supported by WanGP not sufficient ? Too impatient to wait for the next release to get the support for a newly released model ? Your prayers have been answered: if a new model is compatible with a model architecture supported by WanGP, you can add by yourself the support for this model in WanGP by just creating a finetune model definition. You can then store this model in the cloud (for instance in Huggingface) and the very light finetune definition file can be easily shared with other users. WanGP will download automatically the finetuned model for them.
 
 To celebrate the new finetunes support, here are a few finetune gifts (directly accessible from the model selection menu):
 - *Fast Hunyuan Video* : generate model t2v in only 6 steps
