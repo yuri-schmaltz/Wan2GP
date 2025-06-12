@@ -315,7 +315,7 @@ class Inference(object):
 
 
     @classmethod
-    def from_pretrained(cls, model_filepath, text_encoder_filepath, dtype = torch.bfloat16, VAE_dtype = torch.float16, mixed_precision_transformer =torch.bfloat16 , **kwargs):
+    def from_pretrained(cls, model_filepath, base_model_type, text_encoder_filepath,  dtype = torch.bfloat16, VAE_dtype = torch.float16, mixed_precision_transformer =torch.bfloat16 , quantizeTransformer = False, save_quantized = False, **kwargs):
 
         device = "cuda" 
 
@@ -331,23 +331,25 @@ class Inference(object):
         embedded_cfg_scale = 6
         filepath = model_filepath[0]
         i2v_condition_type = None
-        i2v_mode = "i2v" in filepath 
+        i2v_mode = False
         custom = False
         custom_audio = False
         avatar = False 
-        if i2v_mode:
+        if base_model_type == "hunyuan_i2v":
             model_id = "HYVideo-T/2"
             i2v_condition_type = "token_replace"
-        elif "custom" in filepath:
-            if "audio" in filepath:
-                model_id = "HYVideo-T/2-custom-audio"
-                custom_audio = True
-            elif "edit" in filepath:
-                model_id = "HYVideo-T/2-custom-edit"
-            else: 
-                model_id = "HYVideo-T/2-custom"
+            i2v_mode = True
+        elif base_model_type == "hunyuan_custom":
+            model_id = "HYVideo-T/2-custom"
             custom = True
-        elif "avatar" in filepath :
+        elif base_model_type == "hunyuan_custom_audio":
+            model_id = "HYVideo-T/2-custom-audio"
+            custom_audio = True
+            custom = True
+        elif base_model_type == "hunyuan_custom_edit":
+            model_id = "HYVideo-T/2-custom-edit"
+            custom = True
+        elif base_model_type == "hunyuan_avatar":
             model_id = "HYVideo-T/2-avatar"
             text_len = 256
             avatar = True
@@ -385,11 +387,14 @@ class Inference(object):
         # model = Inference.load_state_dict(args, model, model_filepath)
 
         # model_filepath ="c:/temp/hc/mp_rank_00_model_states_video.pt"
-        offload.load_model_data(model, model_filepath, pinToMemory = pinToMemory, partialPinning = partialPinning)
+        offload.load_model_data(model, model_filepath, quantizeTransformer = quantizeTransformer and not save_quantized, pinToMemory = pinToMemory, partialPinning = partialPinning)
         pass
         # offload.save_model(model, "hunyuan_video_avatar_edit_720_bf16.safetensors")
         # offload.save_model(model, "hunyuan_video_avatar_edit_720_quanto_bf16_int8.safetensors", do_quantize= True)
-
+        if save_quantized:            
+            from wan.utils.utils import save_quantized_model
+            save_quantized_model(model, filepath, dtype, None)
+            
         model.mixed_precision = mixed_precision_transformer
 
         if model.mixed_precision :

@@ -29,6 +29,8 @@ class DTT2V:
         checkpoint_dir,
         rank=0,
         model_filename = None,
+        base_model_type = None,
+        save_quantized = False,
         text_encoder_filename = None,
         quantizeTransformer = False,
         dtype = torch.bfloat16,
@@ -61,6 +63,7 @@ class DTT2V:
         from mmgp import offload
         # model_filename = "model.safetensors"
         # model_filename = "c:/temp/diffusion_pytorch_model-00001-of-00006.safetensors"
+        base_config_file = f"configs/{base_model_type}.json"
         self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer, writable_tensors= False) # , forcedConfigPath="c:/temp/config _df720.json")
         # offload.load_model_data(self.model, "recam.ckpt")
         # self.model.cpu()
@@ -72,6 +75,9 @@ class DTT2V:
         # offload.save_model(self.model, "rtfp16_int8.safetensors", do_quantize= "config.json") 
 
         self.model.eval().requires_grad_(False)
+        if save_quantized:            
+            from wan.utils.utils import save_quantized_model
+            save_quantized_model(self.model, model_filename[-1], dtype, base_config_file)
 
         self.scheduler = FlowUniPCMultistepScheduler()
 

@@ -20,6 +20,17 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
 
 ## 🔥 Latest Updates
+### June 12 2025: WanGP v5.6
+👋 *Finetune models*: You find the 20 models supported by WanGP not sufficient ? Too impatient to wait for the next release to get the support for a newly released model ? Your prayers have been answered: if a new model is compatible with a model architecture supported by WanGP, you can add yourself the support for this model in WanGP by just creating Finetune model definition. You can then store this model in the cloud (for instance in Huggingface) and the very light finetune definition file can be easily shared with other users. WanGP will download automatically the finetuned model for them.
+
+To celebrate this new feature, I have provided 4 finetuned model definitions:
+- *Fast Hunyuan Video* : generate model t2v in only 6 steps
+- *Hunyuan Vido AccVideo* : generate model t2v in only 5 steps
+- *Wan FusioniX*: it is a combo of AccVideo / CausVid ans other models and can generate high quality Wan videos in only 8 steps
+- *Vace FusioniX*: the ultimate Vace model, as it is a combo of Vace / AccVideo / CausVid ans other models and can generate high quality Wan Controled videos in only 10 steps
+
+Check the *Finetune Guide* to create finetune models definitions and share them on the WanGP discord server.
+
 ### June 11 2025: WanGP v5.5
 👋 *Hunyuan Video Custom Audio*: it is similar to Hunyuan Video Avatar except there isn't any lower limit on the number of frames and you can use your reference images in a different context than the image itself\
 *Hunyuan Video Custom Edit*: Hunyuan Video Controlnet, use it to do inpainting and replace a person in a video while still keeping his poses. Similar to Vace but less restricted than the Wan models in terms of content...
@@ -96,6 +107,7 @@ For detailed installation instructions for different GPU generations:
 
 ### Advanced Features
 - **[Loras Guide](docs/LORAS.md)** - Using and managing Loras for customization
+- **[Finetunes](docs/FINETUNES.md)** - Add manually new models to WanGP
 - **[VACE ControlNet](docs/VACE.md)** - Advanced video control and manipulation
 - **[Command Line Reference](docs/CLI.md)** - All available command line options
 

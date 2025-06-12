@@ -43,8 +43,8 @@ global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
-target_mmgp_version = "3.4.8"
-WanGP_version = "5.5"
+target_mmgp_version = "3.4.9"
+WanGP_version = "5.6"
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
 from importlib.metadata import version
@@ -161,6 +161,7 @@ def process_prompt_and_add_tasks(state, model_choice):
         return
     
     inputs["model_filename"] = model_filename
+    model_filename = get_base_model_filename(model_filename)
     prompts = prompt.replace("\r", "").split("\n")
     prompts = [prompt.strip() for prompt in prompts if len(prompt.strip())>0 and not prompt.startswith("#")]
     if len(prompts) ==0:
@@ -1160,6 +1161,12 @@ def _parse_args():
     )
 
     parser.add_argument(
+        "--save-quantized",
+        action="store_true",
+        help="Save a quantized version of the current model"
+    )
+
+    parser.add_argument(
         "--preload",
         type=str,
         default="0",
@@ -1429,7 +1436,7 @@ def _parse_args():
     return args
 
 def get_lora_dir(model_filename):
-    
+    model_filename = get_base_model_filename(model_filename)
     model_family = get_model_family(model_filename)
     i2v = test_class_i2v(model_filename)
     if model_family == "wan":
@@ -1543,6 +1550,8 @@ for path in  ["wan2.1_Vace_1.3B_preview_bf16.safetensors", "sky_reels2_diffusion
         print(f"Removing old version of model '{path}'. A new version of this model will be downloaded next time you use it.")
         os.remove( os.path.join("ckpts" , path))
 
+finetunes = {}
+finetunes_filemap = {}
 
 wan_choices_t2v=["ckpts/wan2.1_text2video_1.3B_bf16.safetensors", "ckpts/wan2.1_text2video_14B_bf16.safetensors", "ckpts/wan2.1_text2video_14B_quanto_int8.safetensors",  
                          "ckpts/wan2.1_recammaster_1.3B_bf16.safetensors", "ckpts/sky_reels2_diffusion_forcing_1.3B_mbf16.safetensors", "ckpts/sky_reels2_diffusion_forcing_14B_bf16.safetensors",
@@ -1581,14 +1590,32 @@ model_signatures = {"t2v": "text2video_14B", "t2v_1.3B" : "text2video_1.3B",   "
                     "hunyuan" : "hunyuan_video_720", "hunyuan_i2v" : "hunyuan_video_i2v_720", "hunyuan_custom" : "hunyuan_video_custom_720", "hunyuan_custom_audio" : "hunyuan_video_custom_audio", "hunyuan_custom_edit" : "hunyuan_video_custom_edit",
                     "hunyuan_avatar" : "hunyuan_video_avatar"  }
 
+def get_model_finetune_def(model_filename):
+    model_type = finetunes_filemap.get(model_filename, None )
+    if model_type == None:
+        return None
+    return finetunes.get(model_type, None )
+
+def get_base_model_filename(model_filename):
+    finetune_def = get_model_finetune_def(model_filename)
+    if finetune_def == None:
+        return model_filename
+    else:
+        return finetune_def["base_filename"]
 
 def get_model_type(model_filename):
+    model_type = finetunes_filemap.get(model_filename, None )
+    if model_type != None:
+        return model_type
     for model_type, signature in model_signatures.items():
         if signature in model_filename:
             return model_type        
     raise Exception("Unknown model:" + model_filename)
 
 def get_model_family(model_filename):
+    finetune_def = get_model_finetune_def(model_filename)
+    if finetune_def != None:
+        return finetune_def["model_family"]
     if "wan" in model_filename or "sky" in model_filename:
         return "wan"
     elif "ltxv" in model_filename:
@@ -1599,10 +1626,15 @@ def get_model_family(model_filename):
         raise Exception(f"Unknown model family for model'{model_filename}'")
     
 def test_class_i2v(model_filename):
+    model_filename = get_base_model_filename(model_filename)
     return "image2video" in model_filename or "Fun_InP" in model_filename  or "FLF2V" in model_filename or "fantasy" in model_filename or "hunyuan_video_i2v" in model_filename
 
 def get_model_name(model_filename, description_container = [""]):
-    if "Fun" in model_filename:
+    finetune_def = get_model_finetune_def(model_filename)
+    if finetune_def != None:
+        model_name = finetune_def["name"]
+        description = finetune_def["description"]
+    elif "Fun" in model_filename:
         model_name = "Fun InP image2video"
         model_name += " 14B" if "14B" in model_filename else " 1.3B"
         description = "The Fun model is an alternative image 2 video that supports out the box End Image fixing (contrary to the original Wan image 2 video model). The 1.3B adds also image 2 to video capability  to the 1.3B model."
@@ -1684,8 +1716,12 @@ def get_model_name(model_filename, description_container = [""]):
 
 
 def get_model_filename(model_type, quantization ="int8", dtype_policy = ""):
-    signature = model_signatures[model_type]
-    choices = [ name for name in transformer_choices if signature in name]
+    finetune_def = finetunes.get(model_type, None)
+    if finetune_def != None: 
+        choices = [ "ckpts/" + os.path.basename(path) for path in finetune_def["URLs"] ]
+    else:
+        signature = model_signatures[model_type]
+        choices = [ name for name in transformer_choices if signature in name]
     if len(quantization) == 0:
         quantization = "bf16"
 
@@ -1694,7 +1730,11 @@ def get_model_filename(model_type, quantization ="int8", dtype_policy = ""):
     if len(choices) <= 1:
         raw_filename = choices[0]
     else:
-        sub_choices = [ name for name in choices if quantization in name]
+        if quantization in ("int8", "fp8"):
+            sub_choices = [ name for name in choices if quantization in name]
+        else:
+            sub_choices = [ name for name in choices if "quanto" not in name]
+
         if len(sub_choices) > 0:
             dtype_str = "fp16" if dtype == torch.float16 else "bf16"
             new_sub_choices = [ name for name in sub_choices if dtype_str in name]
@@ -1703,7 +1743,7 @@ def get_model_filename(model_type, quantization ="int8", dtype_policy = ""):
         else:
             raw_filename = choices[0]
 
-    if dtype == torch.float16 and not "fp16" in raw_filename and model_family == "wan" :
+    if dtype == torch.float16 and not "fp16" in raw_filename and model_family == "wan" and finetune_def != None :
         if "quanto_int8" in raw_filename:
             raw_filename = raw_filename.replace("quanto_int8", "quanto_fp16_int8")
         elif "quanto_bf16_int8" in raw_filename:
@@ -1739,81 +1779,87 @@ def get_default_settings(filename):
     i2v = test_class_i2v(filename)
     defaults_filename = get_settings_file_name(filename)
     if not Path(defaults_filename).is_file():
-        ui_defaults = {
-            "prompt": get_default_prompt(i2v),
-            "resolution": "1280x720" if "720p" in filename else "832x480",
-            "video_length": 81,
-            "num_inference_steps": 30,
-            "seed": -1,
-            "repeat_generation": 1,
-            "multi_images_gen_type": 0,        
-            "guidance_scale": 5.0,
-            "embedded_guidance_scale" : 6.0,
-            "audio_guidance_scale": 5.0,
-            "flow_shift": get_default_flow(filename, i2v),
-            "negative_prompt": "",
-            "activated_loras": [],
-            "loras_multipliers": "",
-            "tea_cache": 0.0,
-            "tea_cache_start_step_perc": 0,
-            "RIFLEx_setting": 0,
-            "slg_switch": 0,
-            "slg_layers": [9],
-            "slg_start_perc": 10,
-            "slg_end_perc": 90
-        }
+        finetune_def = get_model_finetune_def(filename)
+        if finetune_def != None:
+            ui_defaults = finetune_def["settings"] 
+            if len(ui_defaults.get("prompt","")) == 0:
+                ui_defaults["prompt"]= get_default_prompt(i2v)
+        else:    
+            ui_defaults = {
+                "prompt": get_default_prompt(i2v),
+                "resolution": "1280x720" if "720p" in filename else "832x480",
+                "video_length": 81,
+                "num_inference_steps": 30,
+                "seed": -1,
+                "repeat_generation": 1,
+                "multi_images_gen_type": 0,        
+                "guidance_scale": 5.0,
+                "embedded_guidance_scale" : 6.0,
+                "audio_guidance_scale": 5.0,
+                "flow_shift": get_default_flow(filename, i2v),
+                "negative_prompt": "",
+                "activated_loras": [],
+                "loras_multipliers": "",
+                "tea_cache": 0.0,
+                "tea_cache_start_step_perc": 0,
+                "RIFLEx_setting": 0,
+                "slg_switch": 0,
+                "slg_layers": [9],
+                "slg_start_perc": 10,
+                "slg_end_perc": 90
+            }
 
-        if get_model_type(filename) in ("hunyuan","hunyuan_i2v"):
-            ui_defaults.update({
-                "guidance_scale": 7.0,
-            })
+            if get_model_type(filename) in ("hunyuan","hunyuan_i2v"):
+                ui_defaults.update({
+                    "guidance_scale": 7.0,
+                })
 
-        if get_model_type(filename) in ("sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B"):
-            ui_defaults.update({
-                "guidance_scale": 6.0,
-                "flow_shift": 8,
-                "sliding_window_discard_last_frames" : 0,
-                "resolution": "1280x720" if "720p" in filename else "960x544",
-                "sliding_window_size" : 121 if "720p" in filename else 97,
-                "RIFLEx_setting": 2,
-                "guidance_scale": 6,
-                "flow_shift": 8,
-            })
+            if get_model_type(filename) in ("sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B"):
+                ui_defaults.update({
+                    "guidance_scale": 6.0,
+                    "flow_shift": 8,
+                    "sliding_window_discard_last_frames" : 0,
+                    "resolution": "1280x720" if "720p" in filename else "960x544",
+                    "sliding_window_size" : 121 if "720p" in filename else 97,
+                    "RIFLEx_setting": 2,
+                    "guidance_scale": 6,
+                    "flow_shift": 8,
+                })
 
 
-        if get_model_type(filename) in ("phantom_1.3B", "phantom_14B"):
-            ui_defaults.update({
-                "guidance_scale": 7.5,
-                "flow_shift": 5,
-                "remove_background_images_ref": 0,
-                # "resolution": "1280x720" 
-            })
+            if get_model_type(filename) in ("phantom_1.3B", "phantom_14B"):
+                ui_defaults.update({
+                    "guidance_scale": 7.5,
+                    "flow_shift": 5,
+                    "remove_background_images_ref": 0,
+                    # "resolution": "1280x720" 
+                })
 
-        elif get_model_type(filename) in ("hunyuan_custom"):
-            ui_defaults.update({
-                "guidance_scale": 7.5,
-                "flow_shift": 13,
-                "resolution": "1280x720",
-            })
-        elif get_model_type(filename) in ("hunyuan_custom_edit"):
-            ui_defaults.update({
-                "guidance_scale": 7.5,
-                "flow_shift": 13,
-                "video_prompt_type": "MV",
-                "sliding_window_size": 129,
-            })
-        elif get_model_type(filename) in ("hunyuan_avatar"):
-            ui_defaults.update({
-                "guidance_scale": 7.5,
-                "flow_shift": 5,
-                "tea_cache_start_step_perc": 25, 
-                "video_length": 129,
-                "video_prompt_type": "I",
-            })
-        elif get_model_type(filename) in ("vace_14B"):
-            ui_defaults.update({
-                "sliding_window_discard_last_frames": 0,
-            })
+            elif get_model_type(filename) in ("hunyuan_custom"):
+                ui_defaults.update({
+                    "guidance_scale": 7.5,
+                    "flow_shift": 13,
+                    "resolution": "1280x720",
+                })
+            elif get_model_type(filename) in ("hunyuan_custom_edit"):
+                ui_defaults.update({
+                    "guidance_scale": 7.5,
+                    "flow_shift": 13,
+                    "video_prompt_type": "MV",
+                    "sliding_window_size": 129,
+                })
+            elif get_model_type(filename) in ("hunyuan_avatar"):
+                ui_defaults.update({
+                    "guidance_scale": 7.5,
+                    "flow_shift": 5,
+                    "tea_cache_start_step_perc": 25, 
+                    "video_length": 129,
+                    "video_prompt_type": "I",
+                })
+            elif get_model_type(filename) in ("vace_14B"):
+                ui_defaults.update({
+                    "sliding_window_discard_last_frames": 0,
+                })
             
 
         with open(defaults_filename, "w", encoding="utf-8") as f:
@@ -1838,6 +1884,30 @@ def get_default_settings(filename):
     if default_number_steps > 0:
         ui_defaults["num_inference_steps"] = default_number_steps
     return ui_defaults
+
+
+finetunes_paths =  glob.glob( os.path.join("finetunes", "*.json") ) 
+finetunes_paths.sort()
+for file_path in finetunes_paths:
+    finetune_id = os.path.basename(file_path)[:-5]
+    with open(file_path, "r", encoding="utf-8") as f:
+        try:
+            json_def = json.load(f)
+        except Exception as e:
+            raise Exception(f"Error while parsing Finetune Definition File '{file_path}': {str(e)}")
+        finetune_def = json_def["model"]
+        del json_def["model"]
+        finetune_def["settings"] = json_def
+        base_filename = get_model_filename(finetune_def["base"])
+        finetune_def["base_filename"] = base_filename
+        finetune_def["model_family"] = get_model_family(base_filename)  
+    finetunes[finetune_id] = finetune_def
+    for url in finetune_def["URLs"]:
+        url = url.split("/")[-1]
+        finetunes_filemap["ckpts/" + url] = finetune_id
+
+model_types += finetunes.keys()
+
 
 transformer_types = server_config.get("transformer_types", [])
 transformer_type = transformer_types[0] if len(transformer_types) > 0 else  model_types[0]
@@ -1904,6 +1974,7 @@ model_filename = ""
 # compile = "transformer"
 
 def get_loras_preprocessor(transformer, model_filename):
+    model_filename = get_base_model_filename(model_filename)
     preprocessor =  getattr(transformer, "preprocess_loras", None)
     if preprocessor == None:
         return None
@@ -1946,6 +2017,8 @@ def get_hunyuan_text_encoder_filename(text_encoder_quantization):
 
 def download_models(transformer_filename):
     def computeList(filename):
+        if filename == None:
+            return []
         pos = filename.rfind("/")
         filename = filename[pos+1:]
         return [filename]        
@@ -1986,6 +2059,32 @@ def download_models(transformer_filename):
 
 
     model_family = get_model_family(transformer_filename)
+    finetune_def = get_model_finetune_def(transformer_filename)
+    if finetune_def != None:
+        from urllib.request import urlretrieve
+        from wan.utils.utils import create_progress_hook
+        if not os.path.isfile(transformer_filename ): 
+            for url in finetune_def["URLs"]:
+                if transformer_filename in url:
+                    break
+            if not url.startswith("http"):
+                raise Exception(f"Model '{transformer_filename}' was not found locally and no URL was provided to download it. Please add an URL in the finetune definition file.")
+            try:
+                urlretrieve(url,transformer_filename, create_progress_hook(transformer_filename))
+            except Exception as e:
+                if os.path.isfile(filename): os.remove(transformer_filename) 
+                raise Exception(f"URL '{url}' is invalid for Model '{transformer_filename}' : {str(e)}'")
+        for url in finetune_def.get("preload_URLs", []):
+            filename = "ckpts/" + url.split("/")[-1]
+            if not os.path.isfile(filename ): 
+                if not url.startswith("http"):
+                    raise Exception(f"File '{filename}' to preload was not found locally and no URL was provided to download it. Please add an URL in the finetune definition file.")
+                try:
+                    urlretrieve(url,filename, create_progress_hook(filename))
+                except Exception as e:
+                    if os.path.isfile(filename): os.remove(filename) 
+                    raise Exception(f"Preload URL '{url}' is invalid: {str(e)}'")
+        transformer_filename = None
     if model_family == "wan":        
         text_encoder_filename = get_wan_text_encoder_filename(text_encoder_quantization)    
         model_def = {
@@ -2022,8 +2121,6 @@ def download_models(transformer_filename):
 
 offload.default_verboseLevel = verbose_level
 
-
-# download_models(transformer_filename) 
 
 def sanitize_file_name(file_name, rep =""):
     return file_name.replace("/",rep).replace("\\",rep).replace(":",rep).replace("|",rep).replace("?",rep).replace("<",rep).replace(">",rep).replace("\"",rep).replace("\n",rep).replace("\r",rep) 
@@ -2111,7 +2208,7 @@ def setup_loras(model_filename, transformer,  lora_dir, lora_preselected_preset,
     return loras, loras_names, loras_presets, default_loras_choices, default_loras_multis_str, default_lora_preset_prompt, default_lora_preset
 
 
-def load_wan_model(model_filename, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False):
+def load_wan_model(model_filename, base_model_type, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized= False):
     filename = model_filename[-1]
     print(f"Loading '{filename}' model...")
 
@@ -2130,11 +2227,13 @@ def load_wan_model(model_filename, quantizeTransformer = False, dtype = torch.bf
         config=cfg,
         checkpoint_dir="ckpts",
         model_filename=model_filename,
+        base_model_type=base_model_type,
         text_encoder_filename= get_wan_text_encoder_filename(text_encoder_quantization),
         quantizeTransformer = quantizeTransformer,
         dtype = dtype,
         VAE_dtype = VAE_dtype, 
-        mixed_precision_transformer = mixed_precision_transformer
+        mixed_precision_transformer = mixed_precision_transformer,
+        save_quantized = save_quantized
     )
 
     pipe = {"transformer": wan_model.model, "text_encoder" : wan_model.text_encoder.model, "vae": wan_model.vae.model }
@@ -2142,7 +2241,7 @@ def load_wan_model(model_filename, quantizeTransformer = False, dtype = torch.bf
         pipe["text_encoder_2"] = wan_model.clip.model
     return wan_model, pipe
 
-def load_ltxv_model(model_filename, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False):
+def load_ltxv_model(model_filename, quantizeTransformer = False, base_model_type = None, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized = False):
     filename = model_filename[-1]
     print(f"Loading '{filename}' model...")
     from ltx_video.ltxv import LTXV
@@ -2161,18 +2260,20 @@ def load_ltxv_model(model_filename, quantizeTransformer = False, dtype = torch.b
 
     return ltxv_model, pipe
 
-def load_hunyuan_model(model_filename, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False):
+def load_hunyuan_model(model_filename, base_model_type = None, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized = False):
     filename = model_filename[-1]
     print(f"Loading '{filename}' model...")
     from hyvideo.hunyuan import HunyuanVideoSampler
 
     hunyuan_model = HunyuanVideoSampler.from_pretrained(
         model_filepath = model_filename,
+        base_model_type = base_model_type,
         text_encoder_filepath = get_hunyuan_text_encoder_filename(text_encoder_quantization),
         dtype = dtype,
-        # quantizeTransformer = quantizeTransformer,
+        quantizeTransformer = quantizeTransformer,
         VAE_dtype = VAE_dtype, 
-        mixed_precision_transformer = mixed_precision_transformer
+        mixed_precision_transformer = mixed_precision_transformer,
+        save_quantized = save_quantized
     )
 
     pipe = { "transformer" : hunyuan_model.model, "text_encoder" : hunyuan_model.text_encoder, "text_encoder_2" : hunyuan_model.text_encoder_2, "vae" : hunyuan_model.vae  }
@@ -2205,9 +2306,15 @@ def get_transformer_model(model):
 
 def load_models(model_filename):
     global transformer_filename, transformer_loras_filenames
+    base_filename = get_base_model_filename(model_filename)
+    base_model_type = get_model_type(base_filename)
+    finetune_def = get_model_finetune_def(model_filename)
+    quantizeTransformer =  finetune_def !=None and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename
+        
     model_family = get_model_family(model_filename)
     perc_reserved_mem_max = args.perc_reserved_mem_max
     preload =int(args.preload)
+    save_quantized = args.save_quantized
     if preload == 0:
         preload = server_config.get("preload_in_VRAM", 0)
     new_transformer_loras_filenames = None
@@ -2217,17 +2324,20 @@ def load_models(model_filename):
     for filename in model_filelist: 
         download_models(filename)
     transformer_dtype = get_transformer_dtype(model_family, transformer_dtype_policy)
+    if quantizeTransformer:
+        transformer_dtype = torch.bfloat16 if "bf16" in model_filename else transformer_dtype
+        transformer_dtype = torch.float16 if "fp16" in model_filename else transformer_dtype
     VAE_dtype = torch.float16 if server_config.get("vae_precision","16") == "16" else torch.float
     mixed_precision_transformer =  server_config.get("mixed_precision","0") == "1"
     transformer_filename = None
     transformer_loras_filenames = None
     new_transformer_filename = model_filelist[-1] 
     if model_family == "wan" :
-        wan_model, pipe = load_wan_model(model_filelist, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer)
+        wan_model, pipe = load_wan_model(model_filelist, base_model_type, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
     elif model_family == "ltxv":
-        wan_model, pipe = load_ltxv_model(model_filelist, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer)
+        wan_model, pipe = load_ltxv_model(model_filelist, base_model_type, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
     elif model_family == "hunyuan":
-        wan_model, pipe = load_hunyuan_model(model_filelist, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer)
+        wan_model, pipe = load_hunyuan_model(model_filelist, base_model_type, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
     else:
         raise Exception(f"Model '{new_transformer_filename}' not supported.")
     wan_model._model_file_name = new_transformer_filename
@@ -2517,6 +2627,7 @@ def refresh_gallery(state): #, msg
         prompt =  task["prompt"]
         params = task["params"]
         model_filename = params["model_filename"] 
+        model_filename = get_base_model_filename(model_filename)
         onemorewindow_visible = "Vace"  in model_filename or "diffusion_forcing" in model_filename or "ltxv" in model_filename
         enhanced = False
         if  prompt.startswith("!enhanced!\n"):
@@ -2942,6 +3053,9 @@ def generate_video(
             raise gr.Error("Error while loading Loras: " + ", ".join(error_files))
     seed = None if seed == -1 else seed
     # negative_prompt = "" # not applicable in the inference
+    original_filename = model_filename 
+    model_filename = get_base_model_filename(model_filename)
+
     image2video = test_class_i2v(model_filename)
     current_video_length = video_length
     enable_RIFLEx = RIFLEx_setting == 0 and current_video_length > (6* 16) or RIFLEx_setting == 1
@@ -3198,7 +3312,11 @@ def generate_video(
                                                                         fit_into_canvas = fit_canvas 
                                                                         )
             elif hunyuan_custom_edit:
-                progress_args = [0, get_latest_status(state,"Extracting Open Pose Information and Expanding Mask")]
+                if "P" in  video_prompt_type:
+                    progress_args = [0, get_latest_status(state,"Extracting Open Pose Information and Expanding Mask")]
+                else:
+                    progress_args = [0, get_latest_status(state,"Extracting Video and Mask")]
+
                 send_cmd("progress", progress_args)
                 src_video, src_mask = preprocess_video_with_mask(video_guide,  video_mask, height=height, width = width, max_frames= current_video_length if window_no == 1 else current_video_length - reuse_frames, start_frame = guide_start_frame, fit_canvas = fit_canvas, target_fps = fps, pose_enhance = "P" in  video_prompt_type)
             if window_no ==  1:                
@@ -3432,6 +3550,7 @@ def generate_video(
                 inputs = get_function_arguments(generate_video, locals())
                 inputs.pop("send_cmd")
                 inputs.pop("task")
+                inputs["model_filename"] = original_filename
                 configs = prepare_inputs_dict("metadata", inputs)
                 configs["prompt"] = "\n".join(original_prompts)
                 if prompt_enhancer_image_caption_model != None and prompt_enhancer !=None and len(prompt_enhancer)>0:
@@ -4197,7 +4316,8 @@ def prepare_inputs_dict(target, inputs ):
 
     if target == "settings":
         return inputs
-    
+    model_filename = get_base_model_filename(model_filename)
+
     if not test_class_i2v(model_filename):
         inputs.pop("image_prompt_type")
 
@@ -4250,7 +4370,7 @@ def export_settings(state):
     settings["model_filename"] = model_filename 
     text = json.dumps(settings, indent=4)
     text_base64 = base64.b64encode(text.encode('utf8')).decode('utf-8')
-    return text_base64
+    return text_base64, sanitize_file_name(model_type + "_" + datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d-%Hh%Mm%Ss") + ".json")
 
 def use_video_settings(state, files):
     gen = get_gen_info(state)
@@ -4581,6 +4701,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
         gen["queue"] = []
         state_dict["gen"] = gen
 
+    model_filename = get_base_model_filename(model_filename)
     preset_to_load = lora_preselected_preset if lora_preset_model == model_filename else "" 
 
     loras, loras_names, loras_presets, default_loras_choices, default_loras_multis_str, default_lora_preset_prompt, default_lora_preset = setup_loras(model_filename,  None,  get_lora_dir(model_filename), preset_to_load, None)
@@ -5001,7 +5122,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                     choices=[
                                         (str(i), i ) for i in range(40)
                                     ],
-                                    value=ui_defaults.get("slg_layers", ["9"]),
+                                    value=ui_defaults.get("slg_layers", [9]),
                                     multiselect= True,
                                     label="Skip Layers",
                                     scale= 3
@@ -5024,7 +5145,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 label="CFG Star"
                             )
                             with gr.Row():
-                                cfg_zero_step = gr.Slider(-1, 39, value=ui_defaults.get("cfg_zero_step",-1), step=1, label="CFG Zero below this Layer (Extra Process)") 
+                                cfg_zero_step = gr.Slider(-1, 39, value=ui_defaults.get("cfg_zero_step",-1), step=1, label="CFG Zero below this Layer (Extra Process)", visible = not (hunyuan_i2v or hunyuan_video_avatar or hunyuan_i2v or hunyuan_video_custom)) 
                 with gr.Tab("Sliding Window", visible= sliding_window_enabled) as sliding_window_tab:
 
                     with gr.Column():  
@@ -5071,6 +5192,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             with gr.Row():
                 settings_file = gr.File(height=41,label="Load Settings From Video / Json")
                 settings_base64_output = gr.Text(interactive= False, visible=False, value = "")
+                settings_filename =  gr.Text(interactive= False, visible=False, value = "")
+
         if not update_form:
             with gr.Column():
                 gen_status = gr.Text(interactive= False, label = "Status")
@@ -5214,10 +5337,10 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                 outputs= None
             ).then(fn=export_settings, 
                 inputs =[state], 
-                outputs= [settings_base64_output]
+                outputs= [settings_base64_output, settings_filename]
             ).then(
                 fn=None,
-                inputs=[settings_base64_output],
+                inputs=[settings_base64_output, settings_filename],
                 outputs=None,
                 js=trigger_settings_download_js
             )
@@ -5799,7 +5922,7 @@ def get_js():
     """
 
     trigger_settings_download_js = """
-    (base64String) => {
+    (base64String, filename) => {
         if (!base64String) {
         console.log("No base64 settings data received, skipping download.");
         return;
@@ -5817,7 +5940,7 @@ def get_js():
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = 'settings.json';
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
 
