@@ -2293,7 +2293,7 @@ def load_models(model_type):
     model_filename = get_model_filename(model_type=model_type, quantization= transformer_quantization, dtype_policy = transformer_dtype_policy) 
     base_model_type = get_base_model_type(model_type)
     finetune_def = get_model_finetune_def(model_type)
-    quantizeTransformer =  finetune_def !=None and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename
+    quantizeTransformer =  finetune_def !=None and  transformer_quantization in ("int8", "fp8") and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename 
         
     model_family = get_model_family(model_type)
     perc_reserved_mem_max = args.perc_reserved_mem_max
