@@ -1624,7 +1624,7 @@ def get_model_family(model_type):
 
 def test_class_i2v(model_type):
     model_type = get_base_model_type(model_type)
-    return model_type in ["i2v", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy", "hunyuan_i2v" ] 
+    return model_type in ["i2v", "i2v_720p", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy", "hunyuan_i2v" ] 
 
 def get_model_name(model_type, description_container = [""]):
     finetune_def = get_model_finetune_def(model_type)
