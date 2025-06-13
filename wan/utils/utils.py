@@ -338,17 +338,19 @@ def create_progress_hook(filename):
     return hook
 
 def save_quantized_model(model, model_filename, dtype,  config_file):
+    if "quanto" in model_filename:
+        return
     from mmgp import offload
     if dtype == torch.bfloat16:
-         model_filename =  model_filename.replace("fp16", "bf16")
+         model_filename =  model_filename.replace("fp16", "bf16").replace("FP16", "bf16")
     elif dtype == torch.float16:
-         model_filename =  model_filename.replace("bf16", "fp16")
+         model_filename =  model_filename.replace("bf16", "fp16").replace("BF16", "bf16")
 
-    if "_fp16" in model_filename:
-        model_filename = model_filename.replace("_fp16", "_quanto_fp16_int8")
-    elif "_bf16" in model_filename:
-        model_filename = model_filename.replace("_bf16", "_quanto_bf16_int8")
-    else:
+    for rep in ["mfp16", "fp16", "mbf16", "bf16"]:
+        if "_" + rep in model_filename:
+            model_filename = model_filename.replace("_" + rep, "_quanto_" + rep + "_int8")
+            break
+    if not "quanto" in model_filename:
         pos = model_filename.rfind(".")
         model_filename =  model_filename[:pos] + "_quanto_int8" + model_filename[pos+1:] 
     

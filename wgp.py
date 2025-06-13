@@ -1624,7 +1624,7 @@ def get_model_family(model_type):
 
 def test_class_i2v(model_type):
     model_type = get_base_model_type(model_type)
-    return model_type in ["i2v", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy", "hunyuan_i2v" ] 
+    return model_type in ["i2v", "i2v_720p", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy", "hunyuan_i2v" ] 
 
 def get_model_name(model_type, description_container = [""]):
     finetune_def = get_model_finetune_def(model_type)
@@ -1731,19 +1731,19 @@ def get_model_filename(model_type, quantization ="int8", dtype_policy = ""):
         raw_filename = choices[0]
     else:
         if quantization in ("int8", "fp8"):
-            sub_choices = [ name for name in choices if quantization in name]
+            sub_choices = [ name for name in choices if quantization in name or quantization.upper() in name]
         else:
             sub_choices = [ name for name in choices if "quanto" not in name]
 
         if len(sub_choices) > 0:
             dtype_str = "fp16" if dtype == torch.float16 else "bf16"
-            new_sub_choices = [ name for name in sub_choices if dtype_str in name]
+            new_sub_choices = [ name for name in sub_choices if dtype_str in name or dtype_str.upper() in name]
             sub_choices = new_sub_choices if len(new_sub_choices) > 0 else sub_choices
             raw_filename = sub_choices[0]
         else:
             raw_filename = choices[0]
 
-    if dtype == torch.float16 and not "fp16" in raw_filename and model_family == "wan" and finetune_def == None :
+    if dtype == torch.float16 and not any("fp16","FP16") in raw_filename and model_family == "wan" and finetune_def == None :
         if "quanto_int8" in raw_filename:
             raw_filename = raw_filename.replace("quanto_int8", "quanto_fp16_int8")
         elif "quanto_bf16_int8" in raw_filename:
@@ -1753,6 +1753,8 @@ def get_model_filename(model_type, quantization ="int8", dtype_policy = ""):
     return raw_filename
 
 def get_transformer_dtype(model_family, transformer_dtype_policy):
+    if not isinstance(transformer_dtype_policy, str):
+        return transformer_dtype_policy
     if len(transformer_dtype_policy) == 0:
         if not bfloat16_supported:
             return torch.float16
@@ -2290,19 +2292,25 @@ def get_transformer_model(model):
 
 def load_models(model_type):
     global transformer_type, transformer_loras_filenames
-    model_filename = get_model_filename(model_type=model_type, quantization= transformer_quantization, dtype_policy = transformer_dtype_policy) 
     base_model_type = get_base_model_type(model_type)
     finetune_def = get_model_finetune_def(model_type)
-    quantizeTransformer =  finetune_def !=None and  transformer_quantization in ("int8", "fp8") and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename 
-        
-    model_family = get_model_family(model_type)
-    perc_reserved_mem_max = args.perc_reserved_mem_max
     preload =int(args.preload)
-    save_quantized = args.save_quantized
+    save_quantized = args.save_quantized and finetune_def != None
+    model_filename = get_model_filename(model_type=model_type, quantization= "" if save_quantized else transformer_quantization, dtype_policy = transformer_dtype_policy) 
+    if save_quantized and "quanto" in model_filename:
+        save_quantized = False
+        print("Need to provide a non quantized model to create a quantized model to be saved") 
+    quantizeTransformer = not save_quantized and finetune_def !=None and transformer_quantization in ("int8", "fp8") and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename         
+    model_family = get_model_family(model_type)
+    transformer_dtype = get_transformer_dtype(model_family, transformer_dtype_policy)
+    if quantizeTransformer or "quanto" in model_filename:
+        transformer_dtype = torch.bfloat16 if "bf16" in model_filename or "BF16" in model_filename else transformer_dtype
+        transformer_dtype = torch.float16 if "fp16" in model_filename or"FP16" in model_filename else transformer_dtype
+    perc_reserved_mem_max = args.perc_reserved_mem_max
     if preload == 0:
         preload = server_config.get("preload_in_VRAM", 0)
     new_transformer_loras_filenames = None
-    dependent_models, dependent_models_types = get_dependent_models(model_type, quantization= transformer_quantization, dtype_policy = transformer_dtype_policy) 
+    dependent_models, dependent_models_types = get_dependent_models(model_type, quantization= transformer_quantization, dtype_policy = transformer_dtype) 
     new_transformer_loras_filenames = [model_filename]  if "_lora" in model_filename else None
     
     model_file_list = dependent_models + [model_filename]
@@ -2310,15 +2318,11 @@ def load_models(model_type):
     new_transformer_filename = model_file_list[-1] 
     if finetune_def != None:
         for module_type in finetune_def.get("modules", []):
-            model_file_list.append(get_model_filename(module_type, transformer_quantization, transformer_dtype_policy))
+            model_file_list.append(get_model_filename(module_type, transformer_quantization, transformer_dtype))
             model_type_list.append(module_type)
 
     for filename, file_model_type in zip(model_file_list, model_type_list): 
         download_models(filename, file_model_type)
-    transformer_dtype = get_transformer_dtype(model_family, transformer_dtype_policy)
-    if quantizeTransformer:
-        transformer_dtype = torch.bfloat16 if "bf16" in model_filename else transformer_dtype
-        transformer_dtype = torch.float16 if "fp16" in model_filename else transformer_dtype
     VAE_dtype = torch.float16 if server_config.get("vae_precision","16") == "16" else torch.float
     mixed_precision_transformer =  server_config.get("mixed_precision","0") == "1"
     transformer_filename = None
@@ -2364,7 +2368,7 @@ def load_models(model_type):
         prompt_enhancer_llm_tokenizer = None
 
         
-    offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = quantizeTransformer, loras = "transformer", coTenantsMap= {}, perc_reserved_mem_max = perc_reserved_mem_max , convertWeightsFloatTo = transformer_dtype, **kwargs)  
+    offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = False, loras = "transformer", coTenantsMap= {}, perc_reserved_mem_max = perc_reserved_mem_max , convertWeightsFloatTo = transformer_dtype, **kwargs)  
     if len(args.gpu) > 0:
         torch.set_default_device(args.gpu)
     transformer_loras_filenames = new_transformer_loras_filenames
@@ -3092,11 +3096,11 @@ def generate_video(
     # TeaCache
     if args.teacache > 0:
         tea_cache_setting = args.teacache 
-    trans.enable_teacache = tea_cache_setting > 0
-    if trans.enable_teacache:
+    trans.enable_cache = tea_cache_setting > 0
+    if trans.enable_cache:
         trans.teacache_multiplier = tea_cache_setting
         trans.rel_l1_thresh = 0
-        trans.teacache_start_step =  int(tea_cache_start_step_perc*num_inference_steps/100)
+        trans.cache_start_step =  int(tea_cache_start_step_perc*num_inference_steps/100)
         if get_model_family(model_type) == "wan":
             if image2video:
                 if '720p' in model_filename:
@@ -3323,7 +3327,7 @@ def generate_video(
             progress_args = [0, merge_status_context(status, "Encoding Prompt")]
             send_cmd("progress", progress_args)
 
-            if trans.enable_teacache:
+            if trans.enable_cache:
                 trans.teacache_counter = 0
                 trans.num_steps = num_inference_steps                
                 trans.teacache_skipped_steps = 0    
@@ -3412,7 +3416,7 @@ def generate_video(
                 trans.previous_residual = None
                 trans.previous_modulated_input = None
 
-            if trans.enable_teacache:
+            if trans.enable_cache:
                 print(f"Teacache Skipped Steps:{trans.teacache_skipped_steps}/{trans.num_steps}" )
 
             if samples != None:

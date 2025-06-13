@@ -116,7 +116,7 @@ class WanI2V:
         self.model.eval().requires_grad_(False)
         if save_quantized:            
             from wan.utils.utils import save_quantized_model
-            save_quantized_model(self.model, model_filename[-1], dtype, base_config_file)
+            save_quantized_model(self.model, model_filename[0], dtype, base_config_file)
 
 
         self.sample_neg_prompt = config.sample_neg_prompt
@@ -317,9 +317,9 @@ class WanI2V:
             "audio_context_lens": audio_context_lens,
             }) 
 
-        if self.model.enable_teacache:
+        if self.model.enable_cache:
             self.model.previous_residual = [None] * (3 if audio_cfg_scale !=None else 2)
-            self.model.compute_teacache_threshold(self.model.teacache_start_step, timesteps, self.model.teacache_multiplier)
+            self.model.compute_teacache_threshold(self.model.cache_start_step, timesteps, self.model.teacache_multiplier)
 
         # self.model.to(self.device)
         if callback != None:

@@ -949,11 +949,11 @@ class HunyuanVideoPipeline(DiffusionPipeline):
         # width = width or self.transformer.config.sample_size * self.vae_scale_factor
         # to deal with lora scaling and other possible forward hooks
         trans = self.transformer
-        if trans.enable_teacache:
+        if trans.enable_cache:
             teacache_multiplier = trans.teacache_multiplier
             trans.accumulated_rel_l1_distance = 0
             trans.rel_l1_thresh = 0.1 if teacache_multiplier < 2 else 0.15
-            # trans.teacache_start_step =  int(tea_cache_start_step_perc*num_inference_steps/100)
+            # trans.cache_start_step =  int(tea_cache_start_step_perc*num_inference_steps/100)
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
             prompt,
@@ -1208,7 +1208,7 @@ class HunyuanVideoPipeline(DiffusionPipeline):
         if ip_cfg_scale>0:
             latent_items += 1
 
-        if self.transformer.enable_teacache:
+        if self.transformer.enable_cache:
             self.transformer.previous_residual = [None] * latent_items
 
         # if is_progress_bar:

@@ -922,7 +922,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         freqs_cis = (freqs_cos, freqs_sin) if freqs_cos is not None else None
         
 
-        if self.enable_teacache:
+        if self.enable_cache:
             if x_id == 0:
                 self.should_calc = True
                 inp = img[0:1] 
@@ -932,7 +932,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                 normed_inp = normed_inp.to(torch.bfloat16)
                 modulated_inp = modulate( normed_inp, shift=img_mod1_shift, scale=img_mod1_scale )
                 del normed_inp, img_mod1_shift, img_mod1_scale
-                if step_no <= self.teacache_start_step or step_no == self.num_steps-1:
+                if step_no <= self.cache_start_step or step_no == self.num_steps-1:
                     self.accumulated_rel_l1_distance = 0
                 else: 
                     coefficients = [7.33226126e+02, -4.01131952e+02,  6.75869174e+01, -3.14987800e+00, 9.61237896e-02]
@@ -950,7 +950,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         if not self.should_calc:
             img += self.previous_residual[x_id]
         else:
-            if self.enable_teacache:            
+            if self.enable_cache:            
                 self.previous_residual[x_id] = None
                 ori_img = img[0:1].clone()
             # --------------------- Pass through DiT blocks ------------------------
@@ -1014,7 +1014,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                     single_block_args = None
 
             # img = x[:, :img_seq_len, ...]
-            if self.enable_teacache:
+            if self.enable_cache:
                 if len(img) > 1:
                     self.previous_residual[0] = torch.empty_like(img)
                     for i, (x, residual) in enumerate(zip(img, self.previous_residual[0])):

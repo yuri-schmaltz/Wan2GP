@@ -78,7 +78,7 @@ class DTT2V:
         self.model.eval().requires_grad_(False)
         if save_quantized:            
             from wan.utils.utils import save_quantized_model
-            save_quantized_model(self.model, model_filename[-1], dtype, base_config_file)
+            save_quantized_model(self.model, model_filename[0], dtype, base_config_file)
 
         self.scheduler = FlowUniPCMultistepScheduler()
 
@@ -316,7 +316,7 @@ class DTT2V:
         updated_num_steps=  len(step_matrix)
         if callback != None:
             callback(-1, None, True, override_num_inference_steps = updated_num_steps)
-        if self.model.enable_teacache:
+        if self.model.enable_cache:
             x_count = 2 if self.do_classifier_free_guidance else 1
             self.model.previous_residual = [None] * x_count 
             time_steps_comb = []
@@ -327,7 +327,7 @@ class DTT2V:
                 if overlap_noise > 0 and valid_interval_start < predix_video_latent_length:
                     timestep[:, valid_interval_start:predix_video_latent_length] = overlap_noise
                 time_steps_comb.append(timestep)
-            self.model.compute_teacache_threshold(self.model.teacache_start_step, time_steps_comb, self.model.teacache_multiplier)
+            self.model.compute_teacache_threshold(self.model.cache_start_step, time_steps_comb, self.model.teacache_multiplier)
             del time_steps_comb
         from mmgp import offload
         freqs = get_rotary_pos_embed(latents.shape[1 :], enable_RIFLEx= False) 

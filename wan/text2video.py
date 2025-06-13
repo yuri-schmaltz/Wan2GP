@@ -101,7 +101,7 @@ class WanT2V:
         self.model.eval().requires_grad_(False)
         if save_quantized:            
             from wan.utils.utils import save_quantized_model
-            save_quantized_model(self.model, model_filename[-1], dtype, base_config_file)
+            save_quantized_model(self.model, model_filename[1 if base_model_type=="fantasy" else 0], dtype, base_config_file)
 
         self.sample_neg_prompt = config.sample_neg_prompt
 
@@ -458,13 +458,24 @@ class WanT2V:
                 z_reactive = [  zz[0:16, 0:overlapped_latents_size + ref_images_count].clone() for zz in z]
 
 
-        if self.model.enable_teacache:
+        if self.model.enable_cache:
             x_count = 3 if phantom else 2
             self.model.previous_residual = [None] * x_count 
-            self.model.compute_teacache_threshold(self.model.teacache_start_step, timesteps, self.model.teacache_multiplier)
+            self.model.compute_teacache_threshold(self.model.cache_start_step, timesteps, self.model.teacache_multiplier)
         if callback != None:
             callback(-1, None, True)
-        prev = 50/1000
+
+        # seq_shape = (21, 45, 80)
+        # local_heads_num = 40 #12 for 1.3B
+
+        # self.model.blocks[0].self_attn.attn.initialize_static_mask(
+        #     seq_shape=seq_shape,
+        #     txt_len=0,
+        #     local_heads_num=local_heads_num,
+        #     device='cuda'
+        # )
+        # self.model.blocks[0].self_attn.attn.layer_counter.reset()
+
         for i, t in enumerate(tqdm(timesteps)):
 
             timestep = [t]

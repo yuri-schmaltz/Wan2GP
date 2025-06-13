@@ -66,14 +66,20 @@ If a model is not quantized, it is assumed to be mostly 16 bits (with maybe a fe
 
 If a model is quantized the term *quanto* should also be included since WanGP supports for the moment only *quanto* quantized model, most specically you should replace *fp16* by *quanto_fp16_int8* or *bf6* by *quanto_bf16_int8*. 
 
+Please note it is important than *bf16", "fp16* and *quanto* are all in lower cases letters.
+
 ## Creating a Quanto Quantized file
 If you launch the app with the *--save-quantized* switch, WanGP will create a quantized file in the **ckpts** subfolder just after the model has been loaded. Please note that the model will *bf16* or *fp16* quantized depending on what you chose in the configuration menu.
 
 1) Make sure that in the finetune definition json file there is only a URL or filepath that points to the non quantized model
 2) Launch WanGP *python wgp.py --save-quantized*
 3) In the configuration menu *Transformer Data Type* property choose either *BF16* of *FP16*
-4) Launch a generation (settings used do not matter). As soon as the model is loaded, a new quantized model  will be created in the **ckpts** subfolder it doesn't already exist.
+4) Launch a video generation (settings used do not matter). As soon as the model is loaded, a new quantized model will be created in the **ckpts** subfolder if it doesn't already exist.
 5) To test that this works properly set the local path in the "URLs" key of the finetune definition file. For instance *URLs = ["ckpts/finetune_quanto_fp16_int8.safetensors"]*
-6) Restart WanGP and select *Scaled Int8 Quantization* in the *Transformer Model Quantization* property
-7) Launch a new generation an verify in the terminal window that the right quantized model is loaded
-8) In order to share the finetune definition file will need to store the fine model weights in the cloud. You can upload them for instance on *Huggingface*. You can now replace in the definition file the local path by a URL (on Huggingface to get the URL of the model file click *Copy download link* when accessing the model properties)
+6) Remove *--save-quantized*, restart WanGP and select *Scaled Int8 Quantization* in the *Transformer Model Quantization* property
+7) Launch a new generation and verify in the terminal window that the right quantized model is loaded
+8) In order to share the finetune definition file you will need to store the fine model weights in the cloud. You can upload them for instance on *Huggingface*. You can now replace in the definition file the local path by a URL (on Huggingface to get the URL of the model file click *Copy download link* when accessing the model properties)
+
+You need to create a quantized model specifically for *bf16* or *fp16* as they can not converted on the fly. However there is no need for a non quantized model as they can be converted on the fly while being loaded.
+
+Wan models supports both *fp16* and *bf16* data types albeit *fp16* delivers in theory better quality. On the contrary Hunyuan and LTXV supports only *bf16*.
