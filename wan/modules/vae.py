@@ -33,9 +33,32 @@ class CausalConv3d(nn.Conv3d):
             padding[4] -= cache_x.shape[2]
             cache_x = None
         x = F.pad(x, padding)
-        x = super().forward(x)
+        try:
+            out = super().forward(x)
+            print("(ran fine)")
+            return out
+        except RuntimeError as e:
+            if "miopenStatus" in str(e):
+                print("⚠️ MIOpen fallback: running Conv3d on CPU")
 
-        return x
+                x_cpu = x.float().cpu()
+                weight_cpu = self.weight.float().cpu()
+                bias_cpu = self.bias.float().cpu() if self.bias is not None else None
+
+                print(f"[Fallback] x shape: {x_cpu.shape}, weight shape: {weight_cpu.shape}")
+                out = F.conv3d(x_cpu, weight_cpu, bias_cpu,
+                               self.stride, (0, 0, 0),  # <-- FIX: no padding here
+                               self.dilation, self.groups)
+
+                out = out.to(x.device)
+                if x.dtype in (torch.float16, torch.bfloat16):
+                    out = out.half()
+                if x.dtype != out.dtype:
+                    out = out.to(x.dtype)
+                print("... returned (from CPU fallback)")
+                return out
+            raise
+
 
 
 class RMS_norm(nn.Module):
