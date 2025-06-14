@@ -1586,7 +1586,7 @@ def get_dependent_models(model_type, quantization, dtype_policy ):
         dependent_model_type = "t2v"
     else:
         return [], []
-    return [get_model_filename(dependent_model_type, quantization, dtype_policy)], []
+    return [get_model_filename(dependent_model_type, quantization, dtype_policy)], [dependent_model_type]
 
 model_types = [ "t2v_1.3B", "t2v", "i2v", "i2v_720p", "flf2v_720p", "vace_1.3B","vace_14B","moviigen", "phantom_1.3B", "phantom_14B", "fantasy",  "fun_inp_1.3B", "fun_inp", "recam_1.3B",  "sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled", "hunyuan", "hunyuan_i2v", "hunyuan_custom", "hunyuan_custom_audio", "hunyuan_custom_edit", "hunyuan_avatar"]
 model_signatures = {"t2v": "text2video_14B", "t2v_1.3B" : "text2video_1.3B",   "fun_inp_1.3B" : "Fun_InP_1.3B",  "fun_inp" :  "Fun_InP_14B", 
