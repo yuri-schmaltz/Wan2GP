@@ -49,6 +49,7 @@ class WanI2V:
         config,
         checkpoint_dir,
         model_filename = None,
+        model_type = None, 
         base_model_type= None,
         text_encoder_filename= None,
         quantizeTransformer = False,
@@ -115,8 +116,8 @@ class WanI2V:
         # offload.save_model(self.model, "wan2.1_Fun_InP_1.3B_bf16_bis.safetensors")
         self.model.eval().requires_grad_(False)
         if save_quantized:            
-            from wan.utils.utils import save_quantized_model
-            save_quantized_model(self.model, model_filename[0], dtype, base_config_file)
+            from wgp import save_quantized_model
+            save_quantized_model(self.model, model_type, model_filename[0], dtype, base_config_file)
 
 
         self.sample_neg_prompt = config.sample_neg_prompt

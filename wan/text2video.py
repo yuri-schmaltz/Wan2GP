@@ -50,6 +50,7 @@ class WanT2V:
         checkpoint_dir,
         rank=0,
         model_filename = None,
+        model_type = None, 
         base_model_type = None,
         text_encoder_filename = None,
         quantizeTransformer = False,
@@ -99,9 +100,9 @@ class WanT2V:
         # offload.save_model(self.model, "wan2.1_text2video_14B_mbf16.safetensors", config_file_path=base_config_file)
         # offload.save_model(self.model, "wan2.1_text2video_14B_quanto_mfp16_int8.safetensors", do_quantize=True, config_file_path=base_config_file)
         self.model.eval().requires_grad_(False)
-        if save_quantized:            
-            from wan.utils.utils import save_quantized_model
-            save_quantized_model(self.model, model_filename[1 if base_model_type=="fantasy" else 0], dtype, base_config_file)
+        if save_quantized:
+            from wgp import save_quantized_model
+            save_quantized_model(self.model, model_type, model_filename[1 if base_model_type=="fantasy" else 0], dtype, base_config_file)
 
         self.sample_neg_prompt = config.sample_neg_prompt
 
@@ -186,7 +187,25 @@ class WanT2V:
     def vace_latent(self, z, m):
         return [torch.cat([zz, mm], dim=0) for zz, mm in zip(z, m)]
 
-    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, original_video = False, keep_frames= [], start_frame = 0,  fit_into_canvas = True, pre_src_video = None):
+    def fit_image_into_canvas(self, ref_img, image_size, canvas_tf_bg, device):
+        ref_width, ref_height = ref_img.size
+        if (ref_height, ref_width) == image_size:
+            ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
+        else:
+            canvas_height, canvas_width = image_size
+            scale = min(canvas_height / ref_height, canvas_width / ref_width)
+            new_height = int(ref_height * scale)
+            new_width = int(ref_width * scale)
+            white_canvas = torch.full((3, 1, canvas_height, canvas_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
+            ref_img = ref_img.resize((new_width, new_height), resample=Image.Resampling.LANCZOS) 
+            ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
+            top = (canvas_height - new_height) // 2
+            left = (canvas_width - new_width) // 2
+            white_canvas[:, :, top:top + new_height, left:left + new_width] = ref_img 
+            ref_img = white_canvas
+        return ref_img.to(device)
+
+    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, original_video = False, keep_frames= [], start_frame = 0,  fit_into_canvas = None, pre_src_video = None, inject_frames = []):
         image_sizes = []
         trim_video = len(keep_frames)
         canvas_height, canvas_width = image_size
@@ -234,25 +253,18 @@ class WanT2V:
                     src_video[i][:, k:k+1] = 0
                     src_mask[i][:, k:k+1] = 1
 
+            for k, frame in enumerate(inject_frames):
+                if frame != None:
+                    src_video[i][:, k:k+1] = self.fit_image_into_canvas(frame, image_size, 0, device)
+                    src_mask[i][:, k:k+1] = 0
+        
+
         for i, ref_images in enumerate(src_ref_images):
             if ref_images is not None:
                 image_size = image_sizes[i]
                 for j, ref_img in enumerate(ref_images):
                     if ref_img is not None:
-                        ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
-                        if ref_img.shape[-2:] != image_size:
-                            canvas_height, canvas_width = image_size
-                            ref_height, ref_width = ref_img.shape[-2:]
-                            white_canvas = torch.ones((3, 1, canvas_height, canvas_width), device=device) # [-1, 1]
-                            scale = min(canvas_height / ref_height, canvas_width / ref_width)
-                            new_height = int(ref_height * scale)
-                            new_width = int(ref_width * scale)
-                            resized_image = F.interpolate(ref_img.squeeze(1).unsqueeze(0), size=(new_height, new_width), mode='bilinear', align_corners=False).squeeze(0).unsqueeze(1)
-                            top = (canvas_height - new_height) // 2
-                            left = (canvas_width - new_width) // 2
-                            white_canvas[:, :, top:top + new_height, left:left + new_width] = resized_image
-                            ref_img = white_canvas
-                        src_ref_images[i][j] = ref_img.to(device)
+                        src_ref_images[i][j] = self.fit_image_into_canvas(ref_img, image_size, 1, device)
         return src_video, src_mask, src_ref_images
 
     def decode_latent(self, zs, ref_images=None, tile_size= 0 ):

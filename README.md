@@ -20,6 +20,18 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
 
 ## 🔥 Latest Updates
+### June 17 2025: WanGP v6.1, Vace Powercharged
+Lots of improvements for Vace the Mother of all Models:
+- masks can now be combined with on the fly processing of a control video, for instance you can extract the motion of a specific person defined by a mask
+- on the fly modification of masks : reversed masks (with the same mask you can modify the background instead of the people covered by the masks), enlarged masks (you can cover more area if for instance the person you are trying to inject is larger than the one in the mask), ...
+- view these modified masks directly inside WanGP during the video generation to check they are really as expected
+- multiple frames injections: multiples frames can be injected at any location of the video
+- expand past videos in on click: just select one generated video to expand it
+
+Of course all these new stuff work on all Vace finetunes (including Vace Fusionix).
+
+Thanks also to Reevoy24 for adding a Notfication sound at the end of a generation and for fixing the background color of the current generation summary.
+
 ### June 12 2025: WanGP v6.0
 👋 *Finetune models*: You find the 20 models supported by WanGP not sufficient ? Too impatient to wait for the next release to get the support for a newly released model ? Your prayers have been answered: if a new model is compatible with a model architecture supported by WanGP, you can add by yourself the support for this model in WanGP by just creating a finetune model definition. You can then store this model in the cloud (for instance in Huggingface) and the very light finetune definition file can be easily shared with other users. WanGP will download automatically the finetuned model for them.
 

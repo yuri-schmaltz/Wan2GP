@@ -78,8 +78,15 @@ def remove_background(img, session=None):
     img = remove(img, session=session, alpha_matting = True, bgcolor=[255, 255, 255, 0]).convert('RGB')
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).movedim(-1, 0)
 
+def save_image(tensor_image, name):
+    import numpy as np
+    tensor_image = tensor_image.clone()
+    tensor_image= tensor_image.add_(1).mul(127.5).squeeze(1).permute(1,2,0)
+    Image.fromarray(tensor_image.cpu().numpy().astype(np.uint8)).save(name)
 
 def calculate_new_dimensions(canvas_height, canvas_width, height, width, fit_into_canvas, block_size = 16):
+    if fit_into_canvas == None:
+        return height, width
     if fit_into_canvas:
         scale1  = min(canvas_height / height, canvas_width / width)
         scale2  = min(canvas_width / height, canvas_height / width)
@@ -337,22 +344,3 @@ def create_progress_hook(filename):
         return progress_hook(block_num, block_size, total_size, filename)
     return hook
 
-def save_quantized_model(model, model_filename, dtype,  config_file):
-    if "quanto" in model_filename:
-        return
-    from mmgp import offload
-    if dtype == torch.bfloat16:
-         model_filename =  model_filename.replace("fp16", "bf16").replace("FP16", "bf16")
-    elif dtype == torch.float16:
-         model_filename =  model_filename.replace("bf16", "fp16").replace("BF16", "bf16")
-
-    for rep in ["mfp16", "fp16", "mbf16", "bf16"]:
-        if "_" + rep in model_filename:
-            model_filename = model_filename.replace("_" + rep, "_quanto_" + rep + "_int8")
-            break
-    if not "quanto" in model_filename:
-        pos = model_filename.rfind(".")
-        model_filename =  model_filename[:pos] + "_quanto_int8" + model_filename[pos+1:] 
-    
-    if not os.path.isfile(model_filename):
-        offload.save_model(model, model_filename, do_quantize= True, config_file_path=config_file)

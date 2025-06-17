@@ -315,7 +315,7 @@ class Inference(object):
 
 
     @classmethod
-    def from_pretrained(cls, model_filepath, base_model_type, text_encoder_filepath,  dtype = torch.bfloat16, VAE_dtype = torch.float16, mixed_precision_transformer =torch.bfloat16 , quantizeTransformer = False, save_quantized = False, **kwargs):
+    def from_pretrained(cls, model_filepath, model_type, base_model_type, text_encoder_filepath,  dtype = torch.bfloat16, VAE_dtype = torch.float16, mixed_precision_transformer =torch.bfloat16 , quantizeTransformer = False, save_quantized = False, **kwargs):
 
         device = "cuda" 
 
@@ -392,8 +392,8 @@ class Inference(object):
         # offload.save_model(model, "hunyuan_video_avatar_edit_720_bf16.safetensors")
         # offload.save_model(model, "hunyuan_video_avatar_edit_720_quanto_bf16_int8.safetensors", do_quantize= True)
         if save_quantized:            
-            from wan.utils.utils import save_quantized_model
-            save_quantized_model(model, filepath, dtype, None)
+            from wgp import save_quantized_model
+            save_quantized_model(model, model_type, filepath, dtype, None)
             
         model.mixed_precision = mixed_precision_transformer
 
