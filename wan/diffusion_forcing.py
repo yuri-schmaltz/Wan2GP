@@ -236,7 +236,7 @@ class DTT2V:
         if input_video != None:
             _ , _ , height, width  = input_video.shape
         elif image_start != None:
-            image_start = image_start[0]
+            image_start = image_start
             frame_width, frame_height  = image_start.size
             height, width = calculate_new_dimensions(height, width, frame_height, frame_width, fit_into_canvas)
             image_start = np.array(image_start.resize((width, height))).transpose(2, 0, 1)

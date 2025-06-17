@@ -302,7 +302,7 @@ def process_prompt_and_add_tasks(state, model_choice):
     if test_any_sliding_window(model_type):
         if video_length > sliding_window_size:
             no_windows = compute_sliding_window_no(video_length, sliding_window_size, sliding_window_discard_last_frames, sliding_window_overlap)
-            gr.Info(f"The Number of Frames to generate ({video_length}) is greater than the Sliding Window Size ({sliding_window_size}) , {no_windows} Windows will be generated")
+            gr.Info(f"The Number of Frames to generate ({video_length}) is greater than the Sliding Window Size ({sliding_window_size}), {no_windows} Windows will be generated")
 
     if "recam" in model_filename:
         if video_source == None:
