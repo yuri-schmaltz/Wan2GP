@@ -528,7 +528,7 @@ def export_image(image_refs, image_output):
     return image_refs
 
 def export_to_current_video_engine(model_type, foreground_video_output, alpha_video_output):
-    gr.Info("Masked Video Input and Full Mask transferred to Current Video Engine For Inpainting")
+    gr.Info("Original Video and Full Mask have been transferred")
     # return "MV#" + str(time.time()), foreground_video_output, alpha_video_output
     if "custom_edit" in model_type and False:
         return gr.update(), alpha_video_output
@@ -675,7 +675,7 @@ def display(tabs, model_choice, vace_video_input, vace_video_mask, vace_image_re
                     with gr.Column() as output_row: #equal_height=True
                         with gr.Row():
                             with gr.Column(scale=2):
-                                foreground_video_output = gr.Video(label="Masked Video Output", visible=False, elem_classes="video")
+                                foreground_video_output = gr.Video(label="Original Video Output", visible=False, elem_classes="video")
                                 foreground_output_button = gr.Button(value="Black & White Video Output", visible=False, elem_classes="new_button")
                             with gr.Column(scale=2):
                                 alpha_video_output = gr.Video(label="B & W Mask Video Output", visible=False, elem_classes="video")
@@ -684,7 +684,7 @@ def display(tabs, model_choice, vace_video_input, vace_video_mask, vace_image_re
                             with gr.Row(visible= False):
                                 export_to_vace_video_14B_btn = gr.Button("Export to current Video Input Video For Inpainting", visible= False)
                             with gr.Row(visible= True):
-                                export_to_current_video_engine_btn = gr.Button("Export to current Video Input and Video Mask", visible= False)
+                                export_to_current_video_engine_btn = gr.Button("Export to Control Video Input and Video Mask Input", visible= False)
                     
                 export_to_vace_video_14B_btn.click( fn=teleport_to_vace_14B, inputs=[], outputs=[tabs, model_choice]).then(
                     fn=export_to_current_video_engine, inputs= [foreground_video_output, alpha_video_output], outputs= [video_prompt_video_guide_trigger, vace_video_input, vace_video_mask])
