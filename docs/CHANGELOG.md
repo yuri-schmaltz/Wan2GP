@@ -7,6 +7,8 @@ Have I told you that I am a big fan of Vace ? Here are more goodies to unleash i
 - More processing can combined at the same time  (for instance the depth process can be applied outside the mask)
 - Upgraded the depth extractor to Depth Anything 2 which is much more detailed
 
+As a bonus, I have added two finetunes based on the Safe-Forcing technology (which requires only 4 steps to generate a video): Wan 2.1 text2video Self-Forcing and Vace Self-Forcing. I know there is Lora around but the quality of the Lora is worse (at least with Vace) compared to the full model. Don't hesitate to share your opinion about this on the discord server. 
+
 ### June 17 2025: WanGP v6.1, Vace Powercharged
 Lots of improvements for Vace the Mother of all Models:
 - masks can now be combined with on the fly processing of a control video, for instance you can extract the motion of a specific person defined by a mask

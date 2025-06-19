@@ -21,14 +21,14 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 
 ## 🔥 Latest Updates
 ### June 19 2025: WanGP v6.2, Vace even more Powercharged
-Have I told you that I am a big fan of Vace ? Here are more goodies to unleash its power: 
+👋 Have I told you that I am a big fan of Vace ? Here are more goodies to unleash its power: 
 - If you ever wanted to watch Star Wars in 4:3, just use the new *Outpainting* feature and it will add the missing bits of image at the top and the bottom of the screen. The best thing is *Outpainting* can be combined with all the other Vace modifications, for instance you can change the main character of your favorite movie at the same time  
 - More processing can combined at the same time  (for instance the depth process can be applied outside the mask)
 - Upgraded the depth extractor to Depth Anything 2 which is much more detailed
 
-As a bonus, I have added two finetunes based on the Safe-Forcing technology (which requires only 4 steps to generate a video): Wan 2.1 text2video Safe-Forcing and Vace Safe-Forcing. I know there is Lora around but the quality of the Lora is worse (at least with Vace) compared to the full model. Don't hesiate to share your opinion about this on the discord server. 
+As a bonus, I have added two finetunes based on the Safe-Forcing technology (which requires only 4 steps to generate a video): Wan 2.1 text2video Self-Forcing and Vace Self-Forcing. I know there is Lora around but the quality of the Lora is worse (at least with Vace) compared to the full model. Don't hesitate to share your opinion about this on the discord server. 
 ### June 17 2025: WanGP v6.1, Vace Powercharged
-Lots of improvements for Vace the Mother of all Models:
+👋 Lots of improvements for Vace the Mother of all Models:
 - masks can now be combined with on the fly processing of a control video, for instance you can extract the motion of a specific person defined by a mask
 - on the fly modification of masks : reversed masks (with the same mask you can modify the background instead of the people covered by the masks), enlarged masks (you can cover more area if for instance the person you are trying to inject is larger than the one in the mask), ...
 - view these modified masks directly inside WanGP during the video generation to check they are really as expected
