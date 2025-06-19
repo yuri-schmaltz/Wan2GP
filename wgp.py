@@ -1814,6 +1814,7 @@ def get_default_settings(model_type):
                     "guidance_scale": 7.5,
                     "flow_shift": 5,
                     "remove_background_images_ref": 0,
+                    "video_prompt_type": "I",
                     # "resolution": "1280x720" 
                 })
 
@@ -1822,6 +1823,12 @@ def get_default_settings(model_type):
                     "guidance_scale": 7.5,
                     "flow_shift": 13,
                     "resolution": "1280x720",
+                    "video_prompt_type": "I",
+                })
+            elif model_type in ("hunyuan_custom_audio"):
+                ui_defaults.update({
+                    "guidance_scale": 7.5,
+                    "flow_shift": 13,
                     "video_prompt_type": "I",
                 })
             elif model_type in ("hunyuan_custom_edit"):
@@ -5286,6 +5293,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                 video_mask = gr.Video(label= "Video Mask Area (for Inpainting, white = Control Area, black = Unchanged)", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value , value= ui_defaults.get("video_mask", None)) 
 
                 mask_expand = gr.Slider(-10, 50, value=ui_defaults.get("mask_expand", 0), step=1, label="Expand / Shrink Mask Area", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value )
+
+                if (phantom or hunyuan_video_custom) and not "I" in video_prompt_type_value: video_prompt_type_value += "I"
 
                 image_refs = gr.Gallery( label ="Start Image" if hunyuan_video_avatar else "Reference Images",
                         type ="pil",   show_label= True,
