@@ -108,7 +108,7 @@ git clone https://github.com/deepbeepmeep/Wan2GP.git
 cd Wan2GP
 conda create -n wan2gp python=3.10.9
 conda activate wan2gp
-pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/test/cu124
+pip install torch==2.7.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/test/cu124
 pip install -r requirements.txt
 ```
 
@@ -116,6 +116,14 @@ pip install -r requirements.txt
 ```bash
 python wgp.py  # Text-to-video (default)
 python wgp.py --i2v  # Image-to-video
+```
+
+**Update the application:**
+If using Pinokio use Pinokio to update otherwise:
+Get in the directory where WanGP is installed and:
+```bash
+git pull
+pip install -r requirements.txt
 ```
 
 ## 📦 Installation
