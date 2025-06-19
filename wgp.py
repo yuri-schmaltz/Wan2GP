@@ -37,7 +37,7 @@ import glob
 import cv2
 from transformers.utils import logging
 logging.set_verbosity_error
-
+from preprocessing.matanyone  import app as matanyone_app
 from tqdm import tqdm
 import requests
 global_queue_ref = []
@@ -57,6 +57,8 @@ if mmgp_version != target_mmgp_version:
 lock = threading.Lock()
 current_task_id = None
 task_id = 0
+vmc_event_handler = matanyone_app.get_vmc_event_handler()
+
 
 
 def download_ffmpeg():
@@ -2536,13 +2538,14 @@ def apply_changes(  state,
         if v != v_old:
             changes.append(k)
 
-    global attention_mode, profile, compile, vae_config, boost, lora_dir, reload_needed, preload_model_policy, transformer_quantization, transformer_dtype_policy, transformer_types, text_encoder_quantization
+    global attention_mode, profile, compile, vae_config, boost, lora_dir, reload_needed, preload_model_policy, transformer_quantization, transformer_dtype_policy, transformer_types, text_encoder_quantization, save_path 
     attention_mode = server_config["attention_mode"]
     profile = server_config["profile"]
     compile = server_config["compile"]
     text_encoder_quantization = server_config["text_encoder_quantization"]
     vae_config = server_config["vae_config"]
     boost = server_config["boost"]
+    save_path = server_config["save_path"]
     preload_model_policy = server_config["preload_model_policy"]
     transformer_quantization = server_config["transformer_quantization"]
     transformer_dtype_policy = server_config["transformer_dtype_policy"]
@@ -6253,12 +6256,12 @@ def generate_dropdown_model_list(current_model_type):
         elem_classes="model_list_class",
         )
 
+def set_new_tab(tab_state, new_tab_no):
+    global vmc_event_handler    
 
-def select_tab(tab_state, evt:gr.SelectData):
     tab_video_mask_creator = 2
 
     old_tab_no = tab_state.get("tab_no",0)
-    new_tab_no = evt.index 
     # print(f"old tab {old_tab_no}, new tab {new_tab_no}")
     if old_tab_no == tab_video_mask_creator:
         vmc_event_handler(False)
@@ -6270,6 +6273,9 @@ def select_tab(tab_state, evt:gr.SelectData):
         else:
             vmc_event_handler(True)
     tab_state["tab_no"] = new_tab_no
+
+def select_tab(tab_state, evt:gr.SelectData):
+    set_new_tab(tab_state, evt.index)
     return gr.Tabs() 
 
 def get_js():
@@ -6707,10 +6713,7 @@ def create_ui():
             with gr.Tab("Guides", id="info") as info_tab:
                 generate_info_tab()
             with gr.Tab("Video Mask Creator", id="video_mask_creator") as video_mask_creator:
-                from preprocessing.matanyone  import app as matanyone_app
-                vmc_event_handler = matanyone_app.get_vmc_event_handler()
-
-                matanyone_app.display(main_tabs, model_choice, video_guide, video_mask, image_refs, video_prompt_type_video_trigger)
+                matanyone_app.display(main_tabs, tab_state, model_choice, video_guide, video_mask, image_refs, video_prompt_type_video_trigger)
             if not args.lock_config:
                 with gr.Tab("Downloads", id="downloads") as downloads_tab:
                     generate_download_tab(lset_name, loras_choices, state)

@@ -536,16 +536,13 @@ def export_to_current_video_engine(model_type, foreground_video_output, alpha_vi
         return foreground_video_output, alpha_video_output
 
 
-def teleport_to_video_tab():
+def teleport_to_video_tab(tab_state):
+    from wgp import set_new_tab
+    set_new_tab(tab_state, 0)
     return gr.Tabs(selected="video_gen")
 
-def teleport_to_vace_1_3B():
-    return gr.Tabs(selected="video_gen"), gr.Dropdown(value="vace_1.3B")
 
-def teleport_to_vace_14B():
-    return gr.Tabs(selected="video_gen"), gr.Dropdown(value="vace_14B")
-
-def display(tabs, model_choice, vace_video_input, vace_video_mask, vace_image_refs, video_prompt_video_guide_trigger):
+def display(tabs, tab_state, model_choice, vace_video_input, vace_video_mask, vace_image_refs, video_prompt_video_guide_trigger):
     # my_tab.select(fn=load_unload_models, inputs=[], outputs=[])
 
     media_url = "https://github.com/pq-yang/MatAnyone/releases/download/media/"
@@ -685,12 +682,9 @@ def display(tabs, model_choice, vace_video_input, vace_video_mask, vace_image_re
                                 export_to_vace_video_14B_btn = gr.Button("Export to current Video Input Video For Inpainting", visible= False)
                             with gr.Row(visible= True):
                                 export_to_current_video_engine_btn = gr.Button("Export to Control Video Input and Video Mask Input", visible= False)
-                    
-                export_to_vace_video_14B_btn.click( fn=teleport_to_vace_14B, inputs=[], outputs=[tabs, model_choice]).then(
-                    fn=export_to_current_video_engine, inputs= [foreground_video_output, alpha_video_output], outputs= [video_prompt_video_guide_trigger, vace_video_input, vace_video_mask])
-                
+                                    
                 export_to_current_video_engine_btn.click(  fn=export_to_current_video_engine, inputs= [model_choice, foreground_video_output, alpha_video_output], outputs= [vace_video_input, vace_video_mask]).then( #video_prompt_video_guide_trigger, 
-                    fn=teleport_to_video_tab, inputs= [], outputs= [tabs])
+                    fn=teleport_to_video_tab, inputs= [tab_state], outputs= [tabs])
 
 
                 # first step: get the video information     
