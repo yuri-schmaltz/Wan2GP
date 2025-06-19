@@ -45,7 +45,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.4.9"
-WanGP_version = "6.1"
+WanGP_version = "6.2"
 settings_version = 2
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
@@ -252,7 +252,7 @@ def process_prompt_and_add_tasks(state, model_choice):
         if video_guide == None:
             gr.Info("You must provide a Control Video")
             return
-        if "A" in video_prompt_type:
+        if "A" in video_prompt_type and not "U" in video_prompt_type:
             if video_mask == None:
                 gr.Info("You must provide a Video Mask")
                 return
@@ -1705,7 +1705,7 @@ def get_model_name(model_type, description_container = [""]):
 def get_model_filename(model_type, quantization ="int8", dtype_policy = ""):
     finetune_def = finetunes.get(model_type, None)
     if finetune_def != None: 
-        choices = [ "ckpts/" + os.path.basename(path) for path in finetune_def["URLs"] ]
+        choices = [ ("ckpts/" + os.path.basename(path) if path.startswith("http") else path)  for path in finetune_def["URLs"] ]
     else:
         signature = model_signatures[model_type]
         choices = [ name for name in transformer_choices if signature in name]
@@ -2055,7 +2055,7 @@ def download_models(model_filename, model_type):
     shared_def = {
         "repoId" : "DeepBeepMeep/Wan2.1",
         "sourceFolderList" : [ "pose", "depth", "mask", "wav2vec", ""  ],
-        "fileList" : [ [],[], ["sam_vit_h_4b8939_fp16.safetensors"], ["config.json", "feature_extractor_config.json", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer_config.json", "vocab.json"],
+        "fileList" : [ [],["depth_anything_v2_vitl.pth"], ["sam_vit_h_4b8939_fp16.safetensors"], ["config.json", "feature_extractor_config.json", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer_config.json", "vocab.json"],
                 [ "flownet.pkl"  ] ]
     }
     process_files_def(**shared_def)
@@ -2776,7 +2776,7 @@ def get_resampled_video(video_in, start_frame, max_frames, target_fps, bridge='t
     # print(f"frame nos: {frame_nos}")
     return frames_list
 
-def get_preprocessor(process_type):
+def get_preprocessor(process_type, inpaint_color):
     if process_type=="pose":
         from preprocessing.dwpose.pose import PoseBodyFaceVideoAnnotator
         cfg_dict = {
@@ -2784,22 +2784,34 @@ def get_preprocessor(process_type):
             "POSE_MODEL": "ckpts/pose/dw-ll_ucoco_384.onnx",
             "RESIZE_SIZE": 1024
         }
-        anno_ins = PoseBodyFaceVideoAnnotator(cfg_dict)
+        anno_ins = lambda img: PoseBodyFaceVideoAnnotator(cfg_dict).forward(img)[0]
     elif process_type=="depth":
-        from preprocessing.midas.depth import DepthVideoAnnotator
+        # from preprocessing.midas.depth import DepthVideoAnnotator
+        # cfg_dict = {
+        #     "PRETRAINED_MODEL": "ckpts/depth/dpt_hybrid-midas-501f0c75.pt"
+        # }
+        # anno_ins = lambda img: DepthVideoAnnotator(cfg_dict).forward(img)[0]
+
+        from preprocessing.depth_anything_v2.depth import DepthV2VideoAnnotator
         cfg_dict = {
-            "PRETRAINED_MODEL": "ckpts/depth/dpt_hybrid-midas-501f0c75.pt"
+            "PRETRAINED_MODEL": "ckpts/depth/depth_anything_v2_vitl.pth"
+            # "PRETRAINED_MODEL": "ckpts/depth/depth_anything_vitb14.pth"
+            
         }
-        anno_ins = DepthVideoAnnotator(cfg_dict)
+        anno_ins = lambda img: DepthV2VideoAnnotator(cfg_dict).forward(img)[0]
     elif process_type=="gray":
         from preprocessing.gray import GrayVideoAnnotator
         cfg_dict = {}
-        anno_ins = GrayVideoAnnotator(cfg_dict)
+        anno_ins = lambda img: GrayVideoAnnotator(cfg_dict).forward(img)[0]
+    elif process_type=="inpaint":
+        anno_ins = lambda img : inpaint_color
+        # anno_ins = lambda img : np.full_like(img, inpaint_color)
     else:
-        anno_ins = None
+        anno_ins = lambda img : img[0]
     return anno_ins
 
-def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,  max_frames, start_frame=0, fit_canvas = False, target_fps = 16, block_size= 16, expand_scale = 2, process_type = "inpainting", to_bbox = False, RGB_Mask = False, negate_mask = False, outpaint_outside_mask = False, inpaint_color = 127):
+def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,  max_frames, start_frame=0, fit_canvas = False, target_fps = 16, block_size= 16, expand_scale = 2, process_type = "inpaint", to_bbox = False, RGB_Mask = False, negate_mask = False, process_outside_mask = None, inpaint_color = 127, outpainting_dims = None):
+    from wan.utils.utils import calculate_new_dimensions
 
     def mask_to_xyxy_box(mask):
         rows, cols = np.where(mask == 255)
@@ -2819,12 +2831,14 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
         return None, None
     any_mask = input_mask_path != None
     pose_special = "pose" in process_type
-    if process_type == "pose_depth":
-        preproc = get_preprocessor("pose")
-        preproc2 = get_preprocessor("depth")
-    else:
-        preproc = get_preprocessor(process_type)
-        preproc2 = None
+    if process_type == "pose_depth": process_type = "pose"
+    any_identity_mask = False
+    if process_type == "identity":
+        any_identity_mask = True
+        negate_mask = False
+        process_outside_mask = None
+    preproc = get_preprocessor(process_type, inpaint_color)
+    preproc2 = get_preprocessor(process_outside_mask, inpaint_color) if process_type != process_outside_mask else preproc
     video = get_resampled_video(input_video_path, start_frame, max_frames, target_fps)
     if any_mask:
         mask_video = get_resampled_video(input_mask_path, start_frame, max_frames, target_fps)
@@ -2832,19 +2846,27 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
     if len(video) == 0 or any_mask and len(mask_video) == 0:
         return None, None
 
-    
-    if fit_canvas != None:
-        frame_height, frame_width, _ = video[0].shape
+    frame_height, frame_width, _ = video[0].shape
 
-        if fit_canvas :
-            scale1  = min(height / frame_height, width /  frame_width)
-            scale2  = min(height / frame_width, width /  frame_height)
-            scale = max(scale1, scale2)
+    if outpainting_dims != None:
+        outpainting_top, outpainting_bottom, outpainting_left, outpainting_right= outpainting_dims
+        if fit_canvas != None:
+            frame_height = int(frame_height * (100 + outpainting_top + outpainting_bottom) / 100)
+            frame_width =  int(frame_width * (100 + outpainting_left + outpainting_right) / 100)
         else:
-            scale =   ((height * width ) /  (frame_height * frame_width))**(1/2)
+            frame_height,frame_width = height, width
 
-        height = (int(frame_height * scale) // block_size) * block_size
-        width = (int(frame_width * scale) // block_size) * block_size
+    if fit_canvas != None:
+        height, width = calculate_new_dimensions(height, width, frame_height, frame_width, fit_into_canvas = fit_canvas, block_size = block_size)
+
+    if outpainting_dims != None:
+        final_height, final_width = height, width
+        height = int(height / ((100 + outpainting_top + outpainting_bottom) / 100))
+        width =  int(width / ((100 + outpainting_left + outpainting_right) / 100)) 
+        margin_top = int(outpainting_top/(100 + outpainting_top + outpainting_bottom) * final_height)
+        if (margin_top + height) > final_height or outpainting_bottom == 0: margin_top = final_height - height
+        margin_left = int(outpainting_left/(100 + outpainting_left + outpainting_right) * final_width)
+        if (margin_left + width) > final_width or outpainting_right == 0: margin_left = final_width - width
 
     if any_mask:
         num_frames = min(len(video), len(mask_video))
@@ -2852,14 +2874,20 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
         num_frames = len(video)
     masked_frames = []
     masks = []
+    if any_identity_mask:
+        any_mask = True
+
     for frame_idx in range(num_frames):
         frame = Image.fromarray(video[frame_idx].cpu().numpy()) #.asnumpy()
         frame = frame.resize((width, height), resample=Image.Resampling.LANCZOS) 
         frame = np.array(frame) 
         if any_mask:
-            mask = Image.fromarray(mask_video[frame_idx].cpu().numpy()) #.asnumpy()
-            mask = mask.resize((width, height), resample=Image.Resampling.LANCZOS) 
-            mask = np.array(mask)
+            if any_identity_mask:
+                mask = np.full( (height, width, 3), 0, dtype= np.uint8)
+            else:
+                mask = Image.fromarray(mask_video[frame_idx].cpu().numpy()) #.asnumpy()
+                mask = mask.resize((width, height), resample=Image.Resampling.LANCZOS) 
+                mask = np.array(mask)
 
             if len(mask.shape) == 3 and mask.shape[2] == 3:
                 mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
@@ -2880,40 +2908,45 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
                 if pose_special:
                     original_mask = 255 - original_mask
 
-        if preproc != None:
-            if pose_special and any_mask:            
-                target_frame = np.where(original_mask[..., None], frame, 0) 
-            else:
-                target_frame = frame 
-            # Image.fromarray(target_frame).save("preprocframe.png")
-            processed_img = preproc.forward([target_frame])[0]
-            if pose_special and outpaint_outside_mask:
-                processed_img = np.where(processed_img ==0, inpaint_color, processed_img) 
-
-            if preproc2 != None:
-                processed_img2 = preproc2.forward([frame])[0]
-                processed_img = (processed_img.astype(np.uint16) + processed_img2.astype(np.uint16))/2
-                processed_img = processed_img.astype(np.uint8)
-            if any_mask:
-                inverse_mask = mask == 0
-                masked_frame = np.where(inverse_mask[..., None], inpaint_color if outpaint_outside_mask else frame, processed_img)
-            else:
-                masked_frame = processed_img
-
+        if pose_special and any_mask:            
+            target_frame = np.where(original_mask[..., None], frame, 0) 
         else:
-            if any_mask and not outpaint_outside_mask:
-                masked_frame = np.where(mask[..., None], inpaint_color, frame)
-            else:
-                masked_frame = np.full_like(frame, inpaint_color)
+            target_frame = frame 
+
+        processed_img = preproc([target_frame])
+
+        if any_mask:
+            if preproc2 != None:
+                frame = preproc2([frame])
+            masked_frame = np.where(mask[..., None], processed_img, frame)
+        else:
+            masked_frame = processed_img
+
             
         if any_mask :
-            if outpaint_outside_mask:
+            if process_outside_mask != None:
                 mask = np.full_like(mask, 255)
             mask = torch.from_numpy(mask)
             if RGB_Mask:
                 mask =  mask.unsqueeze(-1).repeat(1,1,3)
+            if outpainting_dims != None:
+                full_frame= torch.full( (final_height, final_width, mask.shape[-1]), 255, dtype= torch.uint8, device= mask.device)
+                full_frame[margin_top:margin_top+height, margin_left:margin_left+width] = mask
+                mask = full_frame 
             masks.append(mask)
+
+        if isinstance(masked_frame, int):
+            masked_frame= np.full( (height, width, 3), inpaint_color, dtype= np.uint8)
+
         masked_frame = torch.from_numpy(masked_frame)
+        if masked_frame.shape[-1] == 1:
+            masked_frame =  masked_frame.repeat(1,1,3).to(torch.uint8)
+
+        if outpainting_dims != None:
+            full_frame= torch.full( (final_height, final_width, masked_frame.shape[-1]),  inpaint_color, dtype= torch.uint8, device= masked_frame.device)
+            full_frame[margin_top:margin_top+height, margin_left:margin_left+width] = masked_frame
+            masked_frame = full_frame 
+
         masked_frames.append(masked_frame)
     if args.save_masks:
         from preprocessing.dwpose.pose import save_one_video
@@ -2922,10 +2955,14 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
         if any_mask:
             saved_masks = [mask.cpu().numpy() for mask in masks ]
             save_one_video("masks.mp4", saved_masks, fps=target_fps, quality=8, macro_block_size=None)
+    preproc = None
+    preproc2 = None
+    gc.collect()
+    torch.cuda.empty_cache()
 
     return torch.stack(masked_frames), torch.stack(masks) if any_mask else None
 
-def preprocess_video(process_type, height, width, video_in, max_frames, start_frame=0, fit_canvas = None, target_fps = 16, block_size = 16):
+def preprocess_video(height, width, video_in, max_frames, start_frame=0, fit_canvas = None, target_fps = 16, block_size = 16):
 
     frames_list = get_resampled_video(video_in, start_frame, max_frames, target_fps)
 
@@ -2953,12 +2990,7 @@ def preprocess_video(process_type, height, width, video_in, max_frames, start_fr
         frame = frame.resize((new_width,new_height), resample=Image.Resampling.LANCZOS) 
         processed_frames_list.append(frame)
 
-    anno_ins = get_preprocessor(process_type)
-     
-    if anno_ins == None:
-        np_frames = [np.array(frame) for frame in processed_frames_list]
-    else:
-        np_frames = anno_ins.forward(processed_frames_list)
+    np_frames = [np.array(frame) for frame in processed_frames_list]
 
     # from preprocessing.dwpose.pose import save_one_video
     # save_one_video("test.mp4", np_frames, fps=8, quality=8, macro_block_size=None)
@@ -3046,6 +3078,7 @@ def generate_video(
     frames_positions,
     video_guide,
     keep_frames_video_guide,
+    video_guide_outpainting,
     video_mask,
     mask_expand,
     audio_guide,
@@ -3255,7 +3288,7 @@ def generate_video(
     source_video = None
     target_camera = None
     if "recam" in model_filename:
-        source_video = preprocess_video("", width=width, height=height,video_in=video_source, max_frames= current_video_length, start_frame = 0, fit_canvas= fit_canvas == 1)
+        source_video = preprocess_video(width=width, height=height,video_in=video_source, max_frames= current_video_length, start_frame = 0, fit_canvas= fit_canvas == 1)
         target_camera = model_mode
 
     audio_proj_split = None
@@ -3409,7 +3442,7 @@ def generate_video(
                     if video_source != None: refresh_preview["video_source"] = get_video_frame(video_source, 0)
                 if video_source != None and len(video_source) > 0 and window_no == 1:
                     keep_frames_video_source= 1000 if len(keep_frames_video_source) ==0 else int(keep_frames_video_source) 
-                    prefix_video  = preprocess_video(None, width=width, height=height,video_in=video_source, max_frames= keep_frames_video_source , start_frame = 0, fit_canvas= sample_fit_canvas, target_fps = fps, block_size = 32 if ltxv else 16)
+                    prefix_video  = preprocess_video(width=width, height=height,video_in=video_source, max_frames= keep_frames_video_source , start_frame = 0, fit_canvas= sample_fit_canvas, target_fps = fps, block_size = 32 if ltxv else 16)
                     prefix_video  = prefix_video .permute(3, 0, 1, 2)
                     prefix_video  = prefix_video .float().div_(127.5).sub_(1.) # c, f, h, w
                     pre_video_guide =  prefix_video[:, -reuse_frames:]
@@ -3423,24 +3456,39 @@ def generate_video(
                 video_guide_copy = video_guide
                 video_mask_copy = video_mask
                 if "V" in video_prompt_type:
+                    extra_label = ""
+                    if "X" in video_prompt_type:
+                        process_outside_mask = "inpaint"
+                    elif "Y" in video_prompt_type:
+                        process_outside_mask = "depth"
+                        extra_label = " and Depth"
+                    else:
+                        process_outside_mask = None
                     preprocess_type = None
-                    if "P" in video_prompt_type and "D" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,"Extracting Open Pose and Depth Information")]
-                        preprocess_type = "pose_depth"
-                    elif "P" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,"Extracting Open Pose Information")]
+                    # if "P" in video_prompt_type and "D" in video_prompt_type :
+                    #     progress_args = [0, get_latest_status(state,"Extracting Open Pose and Depth Information")]
+                    #     preprocess_type = "pose_depth"
+                    if "P" in video_prompt_type :
+                        progress_args = [0, get_latest_status(state,f"Extracting Open Pose{extra_label} Information")]
                         preprocess_type = "pose"
                     elif "D" in video_prompt_type :
                         progress_args = [0, get_latest_status(state,"Extracting Depth Information")]
                         preprocess_type = "depth"
                     elif "C" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,"Extracting Gray Level Information")]
+                        progress_args = [0, get_latest_status(state,f"Extracting Gray Level{extra_label} Information")]
                         preprocess_type = "gray"
+                    elif "M" in video_prompt_type :
+                        progress_args = [0, get_latest_status(state,f"Creating Inpainting{extra_label} Mask")]
+                        preprocess_type = "inpaint"
+                    elif "U" in video_prompt_type :
+                        progress_args = [0, get_latest_status(state,f"Creating Identity{extra_label} Mask")]
+                        preprocess_type = "identity"
                     else:
-                        progress_args = [0, get_latest_status(state,"Creating Inpainting Mask")]
-                        preprocess_type = "inpainting"
+                        progress_args = [0, get_latest_status(state,f"Creating Vace Generic{extra_label} Mask")]
+                        preprocess_type = "vace"
                     send_cmd("progress", progress_args)
-                    video_guide_copy, video_mask_copy = preprocess_video_with_mask(video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= current_video_length if guide_start_frame == 0 else current_video_length - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps,  process_type = preprocess_type, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, outpaint_outside_mask = "X" in video_prompt_type)
+                    outpainting_dims = None if video_guide_outpainting== None or len(video_guide_outpainting) == 0 or video_guide_outpainting == "0 0 0 0" or video_guide_outpainting.startswith("#") else [int(v) for v in video_guide_outpainting.split(" ")] 
+                    video_guide_copy, video_mask_copy = preprocess_video_with_mask(video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= current_video_length if guide_start_frame == 0 else current_video_length - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps,  process_type = preprocess_type, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims )
                     if video_guide_copy != None:
                         if sample_fit_canvas != None:
                             image_size = video_guide_copy.shape[-3: -1]
@@ -3634,6 +3682,7 @@ def generate_video(
                     else:
                         sample = torch.cat([ prefix_video[:, :-reuse_frames], sample], dim = 1)
                     prefix_video = None
+                    guide_start_frame -= reuse_frames 
                 if sliding_window and window_no > 1:
                     if reuse_frames == 0:
                         sample = sample[: , :]
@@ -4622,6 +4671,8 @@ def load_settings_from_file(state, file_path):
         model_type = get_model_type(model_filename)
         if model_type == None:
             model_type = current_model_type
+    elif not model_type in model_types:
+        model_type = current_model_type
     defaults = state.get(model_type, None) 
     defaults = get_default_settings(model_type) if defaults == None else defaults
     defaults.update(configs)
@@ -4661,6 +4712,7 @@ def save_inputs(
             model_mode,
             video_source,
             keep_frames_video_source,
+            video_guide_outpainting,
             video_prompt_type,
             image_refs,
             frames_positions,
@@ -4735,10 +4787,6 @@ def download_loras():
 def refresh_image_prompt_type(state, image_prompt_type):
     any_video_source = len(filter_letters(image_prompt_type, "VLG"))>0
     return gr.update(visible = "S" in image_prompt_type ), gr.update(visible = "E" in image_prompt_type ), gr.update(visible = "V" in image_prompt_type) , gr.update(visible = any_video_source) 
-
-def refresh_video_prompt_type(state, video_prompt_type):
-    return gr.Gallery(visible = "I" in video_prompt_type), gr.Video(visible= "V" in video_prompt_type),gr.Video(visible= "M" in video_prompt_type ), gr.Text(visible= "V" in video_prompt_type) , gr.Checkbox(visible= "I" in video_prompt_type)
-
 
 def handle_celll_selection(state, evt: gr.SelectData):
     gen = get_gen_info(state)
@@ -4859,25 +4907,29 @@ def refresh_video_prompt_type_image_refs(video_prompt_type, video_prompt_type_im
     video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_image_refs)
     visible = "I" in video_prompt_type
     return video_prompt_type, gr.update(visible = visible),gr.update(visible = visible), gr.update(visible = visible and "F" in video_prompt_type_image_refs)
-                
-def refresh_video_prompt_type_video_guide(video_prompt_type, video_prompt_type_video_guide):
-    video_prompt_type = del_in_sequence(video_prompt_type, "DPCMV")
-    video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_video_guide)
-    visible = "V" in video_prompt_type
-    return video_prompt_type, gr.update(visible = visible), gr.update(visible = visible), gr.update(visible= visible), gr.update(visible= visible and "A" in video_prompt_type ), gr.update(visible= visible and "A" in video_prompt_type )
 
 def refresh_video_prompt_type_video_mask(video_prompt_type, video_prompt_type_video_mask):
-    video_prompt_type = del_in_sequence(video_prompt_type, "XNA")
+    video_prompt_type = del_in_sequence(video_prompt_type, "XYNA")
     video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_video_mask)
     visible= "A" in video_prompt_type     
     return video_prompt_type, gr.update(visible= visible), gr.update(visible= visible )
 
-def refresh_video_prompt_video_guide_trigger(video_prompt_type, video_prompt_type_video_guide):
-    video_prompt_type_video_guide = video_prompt_type_video_guide.split("#")[0]
-    video_prompt_type = del_in_sequence(video_prompt_type, "DPCMV")
+def refresh_video_prompt_type_video_guide(state, video_prompt_type, video_prompt_type_video_guide):
+    video_prompt_type = del_in_sequence(video_prompt_type, "DPCMUV")
     video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_video_guide)
     visible = "V" in video_prompt_type
-    return video_prompt_type, video_prompt_type_video_guide, gr.update(visible= visible ), gr.update(visible= visible ), gr.update(visible= visible and "A" in video_prompt_type ), gr.update(visible= visible and "A" in video_prompt_type )
+    mask_visible = visible and "A" in video_prompt_type and not "U" in video_prompt_type
+    vace = get_base_model_type(state["model_type"]) in ("vace_1.3B","vace_14B") 
+    return video_prompt_type, gr.update(visible = visible), gr.update(visible = visible),gr.update(visible= visible and vace), gr.update(visible= visible and not "U" in video_prompt_type), gr.update(visible= mask_visible), gr.update(visible= mask_visible)
+
+def refresh_video_prompt_video_guide_trigger(state, video_prompt_type, video_prompt_type_video_guide):
+    video_prompt_type_video_guide = video_prompt_type_video_guide.split("#")[0]
+    video_prompt_type = del_in_sequence(video_prompt_type, "DPCMUV")
+    video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_video_guide)
+    visible = "V" in video_prompt_type
+    mask_visible = visible and "A" in video_prompt_type and not "U" in video_prompt_type
+    vace = get_base_model_type(state["model_type"]) in ("vace_1.3B","vace_14B") 
+    return video_prompt_type, video_prompt_type_video_guide, gr.update(visible= visible ),gr.update(visible= visible and vace), gr.update(visible= visible and not "U" in video_prompt_type), gr.update(visible= mask_visible), gr.update(visible= mask_visible)
 
 
 def refresh_preview(state):
@@ -4925,6 +4977,23 @@ def show_preview_column_modal(state, column_no):
     value = get_modal_image( list_uri[column_no],names[column_no]  )
 
     return -1, gr.update(value=value), gr.update(visible=True)
+
+def update_video_guide_outpainting(video_guide_outpainting_value, value, pos):
+    if len(video_guide_outpainting_value) <= 1:
+        video_guide_outpainting_list = ["0"] * 4
+    else:
+        video_guide_outpainting_list = video_guide_outpainting_value.split(" ")
+    video_guide_outpainting_list[pos] = str(value)
+    if all(v=="0" for v in video_guide_outpainting_list):
+        return ""
+    return " ".join(video_guide_outpainting_list)
+
+def refresh_video_guide_outpainting_row(video_guide_outpainting_checkbox, video_guide_outpainting):
+    video_guide_outpainting = video_guide_outpainting[1:] if video_guide_outpainting_checkbox else "#" + video_guide_outpainting 
+        
+    return gr.update(visible=video_guide_outpainting_checkbox), video_guide_outpainting
+
+
 def generate_video_tab(update_form = False, state_dict = None, ui_defaults = None, model_choice = None, header = None, main = None):
     global inputs_names #, advanced
 
@@ -5129,15 +5198,16 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     if vace:
                         video_prompt_type_video_guide = gr.Dropdown(
                             choices=[
-                                ("None", ""),
+                                ("No Control Video", ""),
                                 ("Transfer Human Motion", "PV"),
                                 ("Transfer Depth", "DV"),
-                                ("Transfer Human Motion & Depth", "DPV"),
+                                # ("Transfer Human Motion & Depth", "DPV"),
                                 ("Recolorize Control Video", "CV"),
                                 ("Inpainting", "MV"),
-                                ("Vace multi formats", "V"),
+                                ("Vace raw format", "V"),
+                                ("Keep Unchanged", "UV"),
                             ],
-                            value=filter_letters(video_prompt_type_value, "DPCMV"),
+                            value=filter_letters(video_prompt_type_value, "DPCMUV"),
                             label="Control Video Process", scale = 2, visible= True
                         )
                     elif hunyuan_video_custom_edit:
@@ -5146,7 +5216,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Inpaint Control Video", "MV"),
                                 ("Transfer Human Motion", "PMV"),
                             ],
-                            value=filter_letters(video_prompt_type_value, "DPCMV"),
+                            value=filter_letters(video_prompt_type_value, "DPCMUV"),
                             label="Video to Video", scale = 3, visible= True
                         )
                     else:
@@ -5172,9 +5242,11 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Non Masked Area", "NA"),
                                 ("Masked Area, rest Outpainted", "XA"),
                                 ("Non Masked Area, rest Inpainted", "XNA"),
+                                ("Masked Area, rest Depth", "YA"),
+                                ("Non Masked Area, rest Depth", "YNA"),
                             ],
-                            value= filter_letters(video_prompt_type_value, "XNA"),
-                            visible=  "V" in video_prompt_type_value and not hunyuan_video_custom,
+                            value= filter_letters(video_prompt_type_value, "XYNA"),
+                            visible=  "V" in video_prompt_type_value and not "U" in video_prompt_type_value and not hunyuan_video_custom,
                             label="Area Processed", scale = 2
                         )
                     if vace:
@@ -5198,6 +5270,23 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
  
                 video_guide = gr.Video(label= "Control Video", visible= "V" in video_prompt_type_value, value= ui_defaults.get("video_guide", None),)
                 keep_frames_video_guide = gr.Text(value=ui_defaults.get("keep_frames_video_guide","") , visible= "V" in video_prompt_type_value, scale = 2, label= "Frames to keep in Control Video (empty=All, 1=first, a:b for a range, space to separate values)" ) #, -1=last
+                with gr.Column(visible= "V" in video_prompt_type_value and vace) as video_guide_outpainting_col:
+                    video_guide_outpainting_value = ui_defaults.get("video_guide_outpainting","#")
+                    video_guide_outpainting = gr.Text(value=video_guide_outpainting_value , visible= False)
+                    with gr.Group():
+                        video_guide_outpainting_checkbox = gr.Checkbox(label="Enable Outpainting on Control Video", value=len(video_guide_outpainting_value)>0 and not video_guide_outpainting_value.startswith("#") )
+                        with gr.Row(visible = not video_guide_outpainting_value.startswith("#")) as video_guide_outpainting_row:
+                            video_guide_outpainting_value = video_guide_outpainting_value[1:] if video_guide_outpainting_value.startswith("#") else video_guide_outpainting_value
+                            video_guide_outpainting_list = [0] * 4 if len(video_guide_outpainting_value) == 0 else [int(v) for v in video_guide_outpainting_value.split(" ")]
+                            video_guide_outpainting_top= gr.Slider(0, 100, value= video_guide_outpainting_list[0], step=5, label="Top %", show_reset_button= False)
+                            video_guide_outpainting_bottom = gr.Slider(0, 100, value= video_guide_outpainting_list[1], step=5, label="Bottom %", show_reset_button= False)
+                            video_guide_outpainting_left = gr.Slider(0, 100, value= video_guide_outpainting_list[2], step=5, label="Left %", show_reset_button= False)
+                            video_guide_outpainting_right = gr.Slider(0, 100, value= video_guide_outpainting_list[3], step=5, label="Right %", show_reset_button= False)
+
+                video_mask = gr.Video(label= "Video Mask Area (for Inpainting, white = Control Area, black = Unchanged)", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value , value= ui_defaults.get("video_mask", None)) 
+
+                mask_expand = gr.Slider(-10, 50, value=ui_defaults.get("mask_expand", 0), step=1, label="Expand / Shrink Mask Area", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value )
+
                 image_refs = gr.Gallery( label ="Start Image" if hunyuan_video_avatar else "Reference Images",
                         type ="pil",   show_label= True,
                         columns=[3], rows=[1], object_fit="contain", height="auto", selected_index=0, interactive= True, visible= "I" in video_prompt_type_value, 
@@ -5215,10 +5304,6 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     label="Remove Background of Images References (non positioned frames only)", scale = 3, visible= "I" in video_prompt_type_value and not hunyuan_video_avatar
                 )
 
-
-                video_mask = gr.Video(label= "Video Mask Area (for Inpainting or Outpainting, white = Control Area, black = Unchanged)", visible= "A" in video_prompt_type_value, value= ui_defaults.get("video_mask", None)) 
-
-                mask_expand = gr.Slider(-10, 50, value=ui_defaults.get("mask_expand", 0), step=1, label="Expand / Shrink Mask Area", visible= "A" in video_prompt_type_value)
 
             audio_guide = gr.Audio(value= ui_defaults.get("audio_guide", None), type="filepath", label="Voice to follow", show_download_button= True, visible= fantasy or hunyuan_video_avatar or hunyuan_video_custom_audio   )
 
@@ -5551,7 +5636,9 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
         extra_inputs = prompt_vars + [wizard_prompt, wizard_variables_var, wizard_prompt_activated_var, video_prompt_column, image_prompt_column,
                                       prompt_column_advanced, prompt_column_wizard_vars, prompt_column_wizard, lset_name, advanced_row, speed_tab, quality_tab,
                                       sliding_window_tab, misc_tab, prompt_enhancer_row, inference_steps_row, skip_layer_guidance_row,
-                                      video_prompt_type_video_guide, video_prompt_type_video_mask, video_prompt_type_image_refs] # show_advanced presets_column,
+                                      video_prompt_type_video_guide, video_prompt_type_video_mask, video_prompt_type_image_refs,
+                                      video_guide_outpainting_col,video_guide_outpainting_top, video_guide_outpainting_bottom, video_guide_outpainting_left, video_guide_outpainting_right,
+                                      video_guide_outpainting_checkbox, video_guide_outpainting_row] # show_advanced presets_column,
         if update_form:
             locals_dict = locals()
             gen_inputs = [state_dict if k=="state" else locals_dict[k]  for k in inputs_names] + [state_dict] + extra_inputs
@@ -5561,12 +5648,16 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             target_settings = gr.Text(value = "settings", interactive= False, visible= False)
 
             image_prompt_type.change(fn=refresh_image_prompt_type, inputs=[state, image_prompt_type], outputs=[image_start, image_end, video_source, keep_frames_video_source] ) 
-            video_prompt_video_guide_trigger.change(fn=refresh_video_prompt_video_guide_trigger, inputs=[video_prompt_type, video_prompt_video_guide_trigger], outputs=[video_prompt_type, video_prompt_type_video_guide, video_guide, keep_frames_video_guide, video_prompt_type_video_mask, video_mask, mask_expand])
+            video_prompt_video_guide_trigger.change(fn=refresh_video_prompt_video_guide_trigger, inputs=[state, video_prompt_type, video_prompt_video_guide_trigger], outputs=[video_prompt_type, video_prompt_type_video_guide, video_guide, keep_frames_video_guide, video_guide_outpainting_col, video_prompt_type_video_mask, video_mask, mask_expand])
             video_prompt_type_image_refs.input(fn=refresh_video_prompt_type_image_refs, inputs = [video_prompt_type, video_prompt_type_image_refs], outputs = [video_prompt_type, image_refs, remove_background_images_ref, frames_positions ])
-            video_prompt_type_video_guide.input(fn=refresh_video_prompt_type_video_guide, inputs = [video_prompt_type, video_prompt_type_video_guide], outputs = [video_prompt_type, video_guide, keep_frames_video_guide, video_prompt_type_video_mask, video_mask, mask_expand])
+            video_prompt_type_video_guide.input(fn=refresh_video_prompt_type_video_guide, inputs = [state, video_prompt_type, video_prompt_type_video_guide], outputs = [video_prompt_type, video_guide, keep_frames_video_guide, video_guide_outpainting_col, video_prompt_type_video_mask, video_mask, mask_expand])
             video_prompt_type_video_mask.input(fn=refresh_video_prompt_type_video_mask, inputs = [video_prompt_type, video_prompt_type_video_mask], outputs = [video_prompt_type, video_mask, mask_expand])
             multi_prompts_gen_type.select(fn=refresh_prompt_labels, inputs=multi_prompts_gen_type, outputs=[prompt, wizard_prompt])
-
+            video_guide_outpainting_top.input(fn=update_video_guide_outpainting, inputs=[video_guide_outpainting, video_guide_outpainting_top, gr.State(0)], outputs = [video_guide_outpainting] )
+            video_guide_outpainting_bottom.input(fn=update_video_guide_outpainting, inputs=[video_guide_outpainting, video_guide_outpainting_bottom,gr.State(1)], outputs = [video_guide_outpainting] )
+            video_guide_outpainting_left.input(fn=update_video_guide_outpainting, inputs=[video_guide_outpainting, video_guide_outpainting_left,gr.State(2)], outputs = [video_guide_outpainting] )
+            video_guide_outpainting_right.input(fn=update_video_guide_outpainting, inputs=[video_guide_outpainting, video_guide_outpainting_right,gr.State(3)], outputs = [video_guide_outpainting] )
+            video_guide_outpainting_checkbox.input(fn=refresh_video_guide_outpainting_row, inputs=[video_guide_outpainting_checkbox, video_guide_outpainting], outputs= [video_guide_outpainting_row,video_guide_outpainting])
             show_advanced.change(fn=switch_advanced, inputs=[state, show_advanced, lset_name], outputs=[advanced_row, preset_buttons_rows, refresh_lora_btn, refresh2_row ,lset_name ]).then(
                 fn=switch_prompt_type, inputs = [state, wizard_prompt_activated_var, wizard_variables_var, prompt, wizard_prompt, *prompt_vars], outputs = [wizard_prompt_activated_var, wizard_variables_var, prompt, wizard_prompt, prompt_column_advanced, prompt_column_wizard, prompt_column_wizard_vars, *prompt_vars])
             queue_df.select( fn=handle_celll_selection, inputs=state, outputs=[queue_df, modal_image_display, modal_container])

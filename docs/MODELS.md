@@ -108,9 +108,16 @@ Please note that that the term *Text2Video* refers to the underlying Wan archite
 <BR>
 
 ## Wan Special Loras
-### Causvid
+### Safe-Forcing lightx2v Lora
 - **Type**: Distilled model (Lora implementation)
-- **Speed**: 4-12 steps generation, 2x faster
+- **Speed**: 4-8 steps generation, 2x faster (no classifier free guidance)
+- **Compatible**: Works with t2v and i2v Wan 14B models
+- **Setup**: Requires Safe-Forcing lightx2v Lora (see [LORAS.md](LORAS.md))
+
+
+### Causvid Lora
+- **Type**: Distilled model (Lora implementation)
+- **Speed**: 4-12 steps generation, 2x faster (no classifier free guidance)
 - **Compatible**: Works with Wan 14B models
 - **Setup**: Requires CausVid Lora (see [LORAS.md](LORAS.md))
 

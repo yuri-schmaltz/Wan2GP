@@ -97,6 +97,7 @@ class WanT2V:
         # dtype = torch.bfloat16
         # offload.load_model_data(self.model, "ckpts/Wan14BT2VFusioniX_fp16.safetensors")
         offload.change_dtype(self.model, dtype, True)
+        # offload.save_model(self.model, "wan2.1_selforcing_fp16.safetensors", config_file_path=base_config_file)
         # offload.save_model(self.model, "wan2.1_text2video_14B_mbf16.safetensors", config_file_path=base_config_file)
         # offload.save_model(self.model, "wan2.1_text2video_14B_quanto_mfp16_int8.safetensors", do_quantize=True, config_file_path=base_config_file)
         self.model.eval().requires_grad_(False)

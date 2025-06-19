@@ -1,6 +1,40 @@
 # Changelog
 
 ## 🔥 Latest News
+### June 19 2025: WanGP v6.2, Vace even more Powercharged
+Have I told you that I am a big fan of Vace ? Here are more goodies to unleash its power: 
+- If you ever wanted to watch Star Wars in 4:3, just use the new *Outpainting* feature and it will add the missing bits of image at the top and the bottom of the screen. The best thing is *Outpainting* can be combined with all the other Vace modifications, for instance you can change the main character of your favorite movie at the same time  
+- More processing can combined at the same time  (for instance the depth process can be applied outside the mask)
+- Upgraded the depth extractor to Depth Anything 2 which is much more detailed
+
+### June 17 2025: WanGP v6.1, Vace Powercharged
+Lots of improvements for Vace the Mother of all Models:
+- masks can now be combined with on the fly processing of a control video, for instance you can extract the motion of a specific person defined by a mask
+- on the fly modification of masks : reversed masks (with the same mask you can modify the background instead of the people covered by the masks), enlarged masks (you can cover more area if for instance the person you are trying to inject is larger than the one in the mask), ...
+- view these modified masks directly inside WanGP during the video generation to check they are really as expected
+- multiple frames injections: multiples frames can be injected at any location of the video
+- expand past videos in on click: just select one generated video to expand it
+
+Of course all these new stuff work on all Vace finetunes (including Vace Fusionix).
+
+Thanks also to Reevoy24 for adding a Notfication sound at the end of a generation and for fixing the background color of the current generation summary.
+
+### June 12 2025: WanGP v6.0
+👋 *Finetune models*: You find the 20 models supported by WanGP not sufficient ? Too impatient to wait for the next release to get the support for a newly released model ? Your prayers have been answered: if a new model is compatible with a model architecture supported by WanGP, you can add by yourself the support for this model in WanGP by just creating a finetune model definition. You can then store this model in the cloud (for instance in Huggingface) and the very light finetune definition file can be easily shared with other users. WanGP will download automatically the finetuned model for them.
+
+To celebrate the new finetunes support, here are a few finetune gifts (directly accessible from the model selection menu):
+- *Fast Hunyuan Video* : generate model t2v in only 6 steps
+- *Hunyuan Vido AccVideo* : generate model t2v in only 5 steps
+- *Wan FusioniX*: it is a combo of AccVideo / CausVid ans other models and can generate high quality Wan videos in only 8 steps
+
+One more thing...
+
+The new finetune system can be used to combine complementaty models : what happens when you combine  Fusionix Text2Video and Vace Control Net ?
+
+You get **Vace FusioniX**: the Ultimate Vace Model, Fast (10 steps, no need for guidance) and with a much better quality Video than the original slower model (despite being the best Control Net out there). Here goes one more finetune...
+
+Check the *Finetune Guide* to create finetune models definitions and share them on the WanGP discord server.
+
 ### June 12 2025: WanGP v5.6
 👋 *Finetune models*: You find the 20 models supported by WanGP not sufficient ? Too impatient to wait for the next release to get the support for a newly released model ? Your prayers have been answered: if a new model is compatible with a model architecture supported by WanGP, you can add by yourself the support for this model in WanGP by just creating a finetune model definition. You can then store this model in the cloud (for instance in Huggingface) and the very light finetune definition file can be easily shared with other users. WanGP will download automatically the finetuned model for them.
 

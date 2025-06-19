@@ -675,7 +675,7 @@ def display(tabs, model_choice, vace_video_input, vace_video_mask, vace_image_re
                     with gr.Column() as output_row: #equal_height=True
                         with gr.Row():
                             with gr.Column(scale=2):
-                                foreground_video_output = gr.Video(label="Original Video Output", visible=False, elem_classes="video")
+                                foreground_video_output = gr.Video(label="Original Video Input", visible=False, elem_classes="video")
                                 foreground_output_button = gr.Button(value="Black & White Video Output", visible=False, elem_classes="new_button")
                             with gr.Column(scale=2):
                                 alpha_video_output = gr.Video(label="B & W Mask Video Output", visible=False, elem_classes="video")

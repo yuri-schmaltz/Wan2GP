@@ -88,6 +88,36 @@ python wgp.py --lora-preset mypreset.lset
 - Presets include comments with usage instructions
 - Share `.lset` files with other users
 
+## Supported Formats
+
+WanGP supports multiple lora formats:
+- **Safetensors** (.safetensors)
+- **Replicate** format
+- **Standard PyTorch** (.pt, .pth)
+
+## Safe-Forcing lightx2v Lora (Video Generation Accelerator)
+
+Safeforcing Lora has been created by Kijai from the Safe-Forcing lightx2v distilled Wan model and can generate videos with only 2 steps and offers also a 2x speed improvement since it doesnt require classifier free guidance. It works on both t2v and i2v models
+
+### Setup Instructions
+1. Download the Lora:
+   ```
+   https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors
+   ```
+2. Place in your `loras/` directory
+
+### Usage
+1. Select a Wan t2v or i2v model (e.g., Wan 2.1 text2video 13B or Vace 13B)
+2. Enable Advanced Mode
+3. In Advanced Generation Tab:
+   - Set Guidance Scale = 1
+   - Set Shift Scale = 5
+4. In Advanced Lora Tab:
+   - Select the Lora above
+   - Set multiplier to 1
+5. Set generation steps to 2-8
+6. Generate!
+
 ## CausVid Lora (Video Generation Accelerator)
 
 CausVid is a distilled Wan model that generates videos in 4-12 steps with 2x speed improvement.
@@ -118,19 +148,14 @@ CausVid is a distilled Wan model that generates videos in 4-12 steps with 2x spe
 
 *Note: Lower steps = lower quality (especially motion)*
 
-## Supported Formats
 
-WanGP supports multiple lora formats:
-- **Safetensors** (.safetensors)
-- **Replicate** format
-- **Standard PyTorch** (.pt, .pth)
 
 ## AccVid Lora (Video Generation Accelerator)
 
 AccVid is a distilled Wan model that generates videos with a 2x speed improvement since classifier free guidance is no longer needed (that is cfg = 1).
 
 ### Setup Instructions
-1. Download the CausVid Lora:
+1. Download the AccVid Lora:
 
 - for t2v models:
    ```
@@ -151,6 +176,9 @@ AccVid is a distilled Wan model that generates videos with a 2x speed improvemen
    - Set Guidance Scale = 1
    - Set Shift Scale = 5
 4. The number steps remain unchanged compared to what you would use with the original model but it will be two times faster since classifier free guidance is not needed
+
+
+https://huggingface.co/Kijai/WanVideo_comfy/blob/main/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank32.safetensors
 
 ## Performance Tips
 
