@@ -167,9 +167,9 @@ def process_prompt_and_add_tasks(state, model_choice):
     if len(errors) > 0:
         gr.Info("Error processing prompt template: " + errors)
         return
-    
+    model_type = get_base_model_type(model_type)
     inputs["model_filename"] = model_filename
-    model_filename = get_model_filename(get_base_model_type(model_type))  
+    model_filename = get_model_filename(model_type)  
     prompts = prompt.replace("\r", "").split("\n")
     prompts = [prompt.strip() for prompt in prompts if len(prompt.strip())>0 and not prompt.startswith("#")]
     if len(prompts) == 0:
@@ -238,6 +238,14 @@ def process_prompt_and_add_tasks(state, model_choice):
     else:
         video_source = None
 
+    if model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_audio", "hunyuan_avatar"]:
+        if image_refs  == None :
+            gr.Info("You must provide an Image Reference") 
+            return
+        if len(image_refs) > 1:
+            gr.Info("Only one Image Reference (a person) is supported for the moment by Hunyuan Custom / Avatar") 
+            return
+        
     if "I" in video_prompt_type:
         if image_refs == None or len(image_refs) == 0:
             gr.Info("You must provide at least one Refererence Image")
@@ -315,13 +323,7 @@ def process_prompt_and_add_tasks(state, model_choice):
             gr.Info("Recammaster source video should be at least 81 frames once the resampling at 16 fps has been done")
             return
 
-    if "phantom" in model_filename or "hunyuan_video_custom" in model_filename or "hunyuan_video_avatar" in model_filename:
-        if image_refs  == None :
-            gr.Info("You must provide an Image Reference") 
-            return
-        if len(image_refs) > 1 and ("hunyuan_video_custom" in model_filename or "hunyuan_video_avatar" in model_filename):
-            gr.Info("Only one Image Reference (a person) is supported for the moment by Hunyuan Custom / Avatar") 
-            return
+
 
     if "hunyuan_custom_custom_edit" in model_filename:
         if video_guide == None:
@@ -1754,6 +1756,25 @@ def get_transformer_dtype(model_family, transformer_dtype_policy):
 def get_settings_file_name(model_type):
     return  os.path.join(args.settings, model_type + "_settings.json")
 
+def fix_settings(model_type, ui_defaults):
+    prompts = ui_defaults.get("prompts", "")
+    if len(prompts) > 0:
+        ui_defaults["prompt"] = prompts
+    image_prompt_type = ui_defaults.get("image_prompt_type", None)
+    if image_prompt_type !=None and not isinstance(image_prompt_type, str):
+        ui_defaults["image_prompt_type"] = "S" if image_prompt_type  == 0 else "SE"
+    model_type = get_base_model_type(model_type)
+    if model_type == None:
+        return
+    
+    video_prompt_type = ui_defaults.get("video_prompt_type", "")
+    if model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_custom_audio", "hunyuan_avatar", "phantom", "phantom_1.3B"]:
+        if not "I" in video_prompt_type:  # workaround for settings corruption
+            video_prompt_type += "I" 
+    if model_type in ["hunyuan"]:
+        del_in_sequence(video_prompt_type, "I")
+    ui_defaults["video_prompt_type"] = video_prompt_type
+
 def get_default_settings(model_type):
     def get_default_prompt(i2v):
         if i2v:
@@ -1859,12 +1880,7 @@ def get_default_settings(model_type):
     else:
         with open(defaults_filename, "r", encoding="utf-8") as f:
             ui_defaults = json.load(f)
-        prompts = ui_defaults.get("prompts", "")
-        if len(prompts) > 0:
-            ui_defaults["prompt"] = prompts
-        image_prompt_type = ui_defaults.get("image_prompt_type", None)
-        if image_prompt_type !=None and not isinstance(image_prompt_type, str):
-            ui_defaults["image_prompt_type"] = "S" if image_prompt_type  == 0 else "SE"
+        fix_settings(model_type, ui_defaults)            
 
     default_seed = args.seed
     if default_seed > -1:
@@ -4693,6 +4709,8 @@ def load_settings_from_file(state, file_path):
     elif not model_type in model_types:
         model_type = current_model_type
     defaults = state.get(model_type, None) 
+    if defaults != None:
+        fix_settings(model_type, defaults)
     defaults = get_default_settings(model_type) if defaults == None else defaults
     defaults.update(configs)
     state[model_type]= defaults
@@ -5302,9 +5320,6 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                 video_mask = gr.Video(label= "Video Mask Area (for Inpainting, white = Control Area, black = Unchanged)", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value , value= ui_defaults.get("video_mask", None)) 
 
                 mask_expand = gr.Slider(-10, 50, value=ui_defaults.get("mask_expand", 0), step=1, label="Expand / Shrink Mask Area", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value )
-
-                if (phantom or hunyuan_video_custom) and not "I" in video_prompt_type_value: video_prompt_type_value += "I"
-                if hunyuan_t2v and not "I" in video_prompt_type_value: video_prompt_type_value = del_in_sequence(video_prompt_type_value, "I")
 
                 image_refs = gr.Gallery( label ="Start Image" if hunyuan_video_avatar else "Reference Images",
                         type ="pil",   show_label= True,
