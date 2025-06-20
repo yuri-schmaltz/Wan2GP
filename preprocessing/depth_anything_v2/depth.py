@@ -26,7 +26,8 @@ class DepthV2Annotator:
         self.model.load_state_dict(
             torch.load(
                 pretrained_model,
-                map_location=self.device
+                map_location=self.device,
+                weights_only=True
             )
         )
         self.model.eval()

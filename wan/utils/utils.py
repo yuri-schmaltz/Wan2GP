@@ -78,11 +78,37 @@ def remove_background(img, session=None):
     img = remove(img, session=session, alpha_matting = True, bgcolor=[255, 255, 255, 0]).convert('RGB')
     return torch.from_numpy(np.array(img).astype(np.float32) / 255.0).movedim(-1, 0)
 
-def save_image(tensor_image, name):
-    import numpy as np
-    tensor_image = tensor_image.clone()
-    tensor_image= tensor_image.add_(1).mul(127.5).squeeze(1).permute(1,2,0)
-    Image.fromarray(tensor_image.cpu().numpy().astype(np.uint8)).save(name)
+def convert_tensor_to_image(t, frame_no = -1):    
+    t = t[:, frame_no] if frame_no >= 0 else t
+    return Image.fromarray(t.clone().add_(1.).mul_(127.5).permute(1,2,0).to(torch.uint8).cpu().numpy())
+
+def save_image(tensor_image, name, frame_no = -1):
+    convert_tensor_to_image(tensor_image, frame_no).save(name)
+
+def get_outpainting_full_area_dimensions(frame_height,frame_width, outpainting_dims):
+    outpainting_top, outpainting_bottom, outpainting_left, outpainting_right= outpainting_dims
+    frame_height = int(frame_height * (100 + outpainting_top + outpainting_bottom) / 100)
+    frame_width =  int(frame_width * (100 + outpainting_left + outpainting_right) / 100)
+    return frame_height, frame_width  
+
+def  get_outpainting_frame_location(final_height, final_width,  outpainting_dims, block_size = 8):
+    outpainting_top, outpainting_bottom, outpainting_left, outpainting_right= outpainting_dims
+    raw_height = int(final_height / ((100 + outpainting_top + outpainting_bottom) / 100))
+    height = int(raw_height / block_size) * block_size
+    extra_height = raw_height - height
+          
+    raw_width = int(final_width / ((100 + outpainting_left + outpainting_right) / 100)) 
+    width = int(raw_width / block_size) * block_size
+    extra_width = raw_width - width  
+    margin_top = int(outpainting_top/(100 + outpainting_top + outpainting_bottom) * final_height)
+    if extra_height != 0 and (outpainting_top + outpainting_bottom) != 0:
+        margin_top += int(outpainting_top / (outpainting_top + outpainting_bottom) * extra_height)
+    if (margin_top + height) > final_height or outpainting_bottom == 0: margin_top = final_height - height
+    margin_left = int(outpainting_left/(100 + outpainting_left + outpainting_right) * final_width)
+    if extra_width != 0 and (outpainting_left + outpainting_right) != 0:
+        margin_left += int(outpainting_left / (outpainting_left + outpainting_right) * extra_height)
+    if (margin_left + width) > final_width or outpainting_right == 0: margin_left = final_width - width
+    return height, width, margin_top, margin_left
 
 def calculate_new_dimensions(canvas_height, canvas_width, height, width, fit_into_canvas, block_size = 16):
     if fit_into_canvas == None:

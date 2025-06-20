@@ -27,6 +27,7 @@ from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 from wan.modules.posemb_layers import get_rotary_pos_embed
 from .utils.vace_preprocessor import VaceVideoProcessor
 from wan.utils.basic_flowmatch import FlowMatchScheduler
+from wan.utils.utils import get_outpainting_frame_location
 
 def optimized_scale(positive_flat, negative_flat):
 
@@ -188,38 +189,52 @@ class WanT2V:
     def vace_latent(self, z, m):
         return [torch.cat([zz, mm], dim=0) for zz, mm in zip(z, m)]
 
-    def fit_image_into_canvas(self, ref_img, image_size, canvas_tf_bg, device):
+    def fit_image_into_canvas(self, ref_img, image_size, canvas_tf_bg, device, fill_max = False, outpainting_dims = None):
+        from wan.utils.utils import save_image
         ref_width, ref_height = ref_img.size
-        if (ref_height, ref_width) == image_size:
+        if (ref_height, ref_width) == image_size and outpainting_dims  == None:
             ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
         else:
-            canvas_height, canvas_width = image_size
+            if outpainting_dims != None:
+                final_height, final_width = image_size
+                canvas_height, canvas_width, margin_top, margin_left =   get_outpainting_frame_location(final_height, final_width,  outpainting_dims, 8)        
+            else:
+                canvas_height, canvas_width = image_size
             scale = min(canvas_height / ref_height, canvas_width / ref_width)
             new_height = int(ref_height * scale)
             new_width = int(ref_width * scale)
-            white_canvas = torch.full((3, 1, canvas_height, canvas_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
-            ref_img = ref_img.resize((new_width, new_height), resample=Image.Resampling.LANCZOS) 
-            ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
+            if fill_max  and (canvas_height - new_height) < 16:
+                new_height = canvas_height
+            if fill_max  and (canvas_width - new_width) < 16:
+                new_width = canvas_width
             top = (canvas_height - new_height) // 2
             left = (canvas_width - new_width) // 2
-            white_canvas[:, :, top:top + new_height, left:left + new_width] = ref_img 
+            ref_img = ref_img.resize((new_width, new_height), resample=Image.Resampling.LANCZOS) 
+            ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
+            if outpainting_dims != None:
+                white_canvas = torch.full((3, 1, final_height, final_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
+                white_canvas[:, :, margin_top + top:margin_top + top + new_height, margin_left + left:margin_left + left + new_width] = ref_img 
+            else:
+                white_canvas = torch.full((3, 1, canvas_height, canvas_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
+                white_canvas[:, :, top:top + new_height, left:left + new_width] = ref_img 
             ref_img = white_canvas
         return ref_img.to(device)
 
-    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, original_video = False, keep_frames= [], start_frame = 0,  fit_into_canvas = None, pre_src_video = None, inject_frames = []):
+    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, original_video = False, keep_frames= [], start_frame = 0,  fit_into_canvas = None, pre_src_video = None, inject_frames = [], outpainting_dims = None):
         image_sizes = []
         trim_video = len(keep_frames)
-        canvas_height, canvas_width = image_size
+        def conv_tensor(t, device):
+            return t.float().div_(127.5).add_(-1).permute(3, 0, 1, 2).to(device)
 
         for i, (sub_src_video, sub_src_mask, sub_pre_src_video) in enumerate(zip(src_video, src_mask,pre_src_video)):
             prepend_count = 0 if sub_pre_src_video == None else sub_pre_src_video.shape[1]
-            num_frames = total_frames - prepend_count 
+            num_frames = total_frames - prepend_count            
+            num_frames = min(num_frames, trim_video) if trim_video > 0 else num_frames
             if sub_src_mask is not None and sub_src_video is not None:
-                src_video[i], src_mask[i], _, _, _ = self.vid_proc.load_video_pair(sub_src_video, sub_src_mask, max_frames= num_frames, trim_video = trim_video - prepend_count, start_frame = start_frame, canvas_height = canvas_height, canvas_width = canvas_width, fit_into_canvas = fit_into_canvas)
+                src_video[i] = conv_tensor(sub_src_video[:num_frames], device)
+                src_mask[i] = conv_tensor(sub_src_mask[:num_frames], device)
                 # src_video is [-1, 1] (at this function output), 0 = inpainting area (in fact 127  in [0, 255])
                 # src_mask is [-1, 1] (at this function output), 0 = preserve original video (in fact 127  in [0, 255]) and 1 = Inpainting (in fact 255  in [0, 255])
-                src_video[i] = src_video[i].to(device)
-                src_mask[i] = src_mask[i].to(device)
                 if prepend_count > 0:
                     src_video[i] =  torch.cat( [sub_pre_src_video, src_video[i]], dim=1)
                     src_mask[i] =  torch.cat( [torch.full_like(sub_pre_src_video, -1.0), src_mask[i]] ,1)
@@ -238,8 +253,7 @@ class WanT2V:
                     src_mask[i] = torch.ones_like(src_video[i], device=device)
                 image_sizes.append(image_size)
             else:
-                src_video[i], _, _, _ = self.vid_proc.load_video(sub_src_video, max_frames= num_frames, trim_video = trim_video - prepend_count, start_frame = start_frame, canvas_height = canvas_height, canvas_width = canvas_width, fit_into_canvas = fit_into_canvas)
-                src_video[i] = src_video[i].to(device)
+                src_video[i] = conv_tensor(sub_src_video[:num_frames], device)
                 src_mask[i] = torch.zeros_like(src_video[i], device=device) if original_video else torch.ones_like(src_video[i], device=device)
                 if prepend_count > 0:
                     src_video[i] =  torch.cat( [sub_pre_src_video, src_video[i]], dim=1)
@@ -256,7 +270,7 @@ class WanT2V:
 
             for k, frame in enumerate(inject_frames):
                 if frame != None:
-                    src_video[i][:, k:k+1] = self.fit_image_into_canvas(frame, image_size, 0, device)
+                    src_video[i][:, k:k+1] = self.fit_image_into_canvas(frame, image_size, 0, device, True, outpainting_dims)
                     src_mask[i][:, k:k+1] = 0
         
 
