@@ -32,14 +32,14 @@ You can either build yourself the Control Video with the annotators tools provid
 
 WanGP wil need the following information to generate a Vace Control Video:
 - A *Control Video* : this video shouldn't have been altered by an annotator tool and can be taken straight from youtube or your camera
-- *Control Video Process* : This is the type of process you want to apply on the control video. For instance *Transfer Human Motion* will generate the Open Pose information from your video so that you can transfer this same motion to a generated character
+- *Control Video Process* : This is the type of process you want to apply on the control video. For instance *Transfer Human Motion* will generate the Open Pose information from your video so that you can transfer this same motion to a generated character. If you want to do only *Spatial Outpainting* or *Temporal Inpainting / Outpainting* you may want to choose the *Keep Unchanged* process.
 - *Area Processed* : you can target the processing to a specific area. For instance even if there are multiple people in the Control Video you may want to replace only one them. If you decide to target an area you will need to provide a *Video Mask* as well. These types of videos can be easily created using the Matanyone tool embedded with WanGP (see the doc of Matanyone below). WanGP can apply different types of process, one the mask and another one on the outside the mask.
 
 Another nice thing is that you can combine all effects above with Outpainting since WanGP will create automatically an outpainting area in the Control Video if you ask for this. 
 
 By default WanGP will ask Vace to generate new frames in the "same spirit" of the control video if the latter is shorter than the number frames that you have requested.
 
-
+Be aware that the Control Video and Video Mask will be before anything happens resampled to the number of frames per second of Vace (usually 16) and resized to the output size you have requested.
 #### 2. Reference Images
 With Reference Images you can inject people or objects of your choice in the Video.
 You can also force Images to appear at a specific frame nos in the Video.
@@ -55,11 +55,28 @@ As stated above WanGP will adapt the Control Video and the Video Mask to meet yo
 
 Look at the background colors of both the Control Video and the Video Mask:
 The Mask Video is the most important because depending on the color of its pixels, the Control Video will be interpreted differently. If an area in the Mask is black, the corresponding Control Video area will be kept as is. On the contrary if an area of the Mask is plain white, a Vace process will be applied on this area. If there isn't any Mask Video the Vace process will apply on the whole video frames. The nature of the process itself will depend on what there is in the Control Video for this area. 
-- if the area in grey (127) in the Control Video, this area will be replaced by new content based on the text prompt or image references
+- if the area is grey (127) in the Control Video, this area will be replaced by new content based on the text prompt or image references
 - if an area represents a person in the wireframe Open Pose format, it will be replaced by a person animated with motion described by the Open Pose.The appearance of the person will depend on the text prompt or image references
 - if an area contains multiples shades of grey, these will be assumed to represent different levels of image depth and Vace will try to generate new content located at the same depth
 
 There are more Vace representations. For all the different mapping please refer the official Vace documentation.
+
+### Other Processing
+Most of the processing below and the ones related to Control Video can be combined together.
+- **Temporal Outpainting**\
+Temporal Outpainting requires an existing *Source Video* or *Control Video* and it amounts to adding missing frames. It is implicit if you use a Source Video that you want to continue (new frames will be added at the end of this Video) or if you provide a Control Video that contains fewer frames than the number that you have requested to generate.
+
+- **Temporal Inpainting**\
+With temporal inpainting you are asking Vace to generate missing frames that should exist between existing frames. There are two ways to do that:
+    - *Injected Reference Images* : Each Image is injected a position of your choice and Vace will fill the gaps between these frames
+    - *Frames to keep in Control Video* : If using a Control Video, you can ask WanGP to hide some of these frames to let Vace generate "alternate frames" for these parts of the Control Video.
+
+- **Spatial Outpainting**\
+This feature creates new content to the top, bottom, left or right of existing frames of a Control Video. You can set the amount of content for each direction by specifying a percentage of extra content in relation to the existing frame. Please note that the resulting video will target the resolution you specified. So if this Resolution corresponds to that of your Control Video you may lose details. Therefore it may be relevant to pick a higher resolution with Spatial Outpainting.\
+There are two ways to do Spatial Outpainting:
+    - *Injected Reference Frames* : new content will be added around Injected Frames
+    - *Control Video* : new content will be added on all the frames of the whole Control Video
+
 
 ### Example 1 : Replace a Person in one video by another one by keeping the Background
 1) In Vace, select *Control Video Process*=**Transfer human pose**, *Area processed*=**Masked area** 
@@ -89,6 +106,7 @@ If instead *Control Video Process*=**Depth**, then the background although it wi
 
 
 ### Creating Face / Object Replacement Masks
+Matanyone is a tool that will generate the Video Mask that needs to be combined with the Control Video. It is very useful as you just need to indicate in the first frame the area you want to mask and it will compute masked areas for the following frames by taking into account the motion.
 1. Load your video in Matanyone
 2. Click on the face or object in the first frame
 3. Validate the mask by clicking **Set Mask**
@@ -99,6 +117,33 @@ If instead *Control Video Process*=**Depth**, then the background although it wi
 - **Negative Point Prompts**: Remove parts from current selection if the mask goes beyond the desired area
 - **Sub Masks**: Create multiple independent masks, then combine them. This may be useful if you are struggling to select exactly what you want.    
 
+
+
+## Window Sliding for Long Videos
+Generate videos up to 1 minute by merging multiple windows:
+The longer the video the greater the quality degradation. However the effect will be less visible if your generated video reuses mostly non altered control video.
+
+When this feature is enabled it is important to keep in mind that every positional argument of Vace (frames positions of *Injected Reference Frames*, *Frames to keep in Control Video*) are related to the first frame of the first Window. This is convenient as changing the size of a sliding window won't have any impact and this allows you define in advance the inject frames for all the windows.
+
+Likewise, if you use *Continue Video File* by providing a *Source Video*, this Source Video will be considered as the first window and the positional arguments will be calculated in relation to the first frame of this Source Video. Also the *overlap window size* parameter will correspond to the number of frames used of the Source Video that is temporally outpainted to produce new content.
+
+### How It Works
+- Each window uses the corresponding time segment of the Control Video
+- Example: 0-4s control video → first window, 4-8s → second window, etc.
+- Automatic overlap management ensures smooth transitions
+
+
+### Formula
+This formula gives the number of Generated Frames for a specific number of Sliding Windows :
+```
+Generated Frames = [Nb Windows - 1] × [Window Size - Overlap - Discard] + Window Size
+```
+
+### Multi-Line Prompts (Experimental)
+If you enable *Text Prompts separated by a Carriage Return will be used for a new Sliding Window*, you can define in advance a different prompt for each window.:
+- Each prompt is separated by a Carriage Return  
+- Each line of prompt will be used for a different window
+- If more windows than prompt lines, last line repeats
 
 ## Recommended Settings
 
@@ -120,35 +165,6 @@ WanGP includes automatic background removal options:
 - Use for reference images containing people/objects
 - **Don't use** this for landscape/setting reference images (the first reference image)
 - If you are not happy with the automatic background removal tool you can use the Image version of Matanyone for a precise background removal
-
-## Window Sliding for Long Videos
-
-Generate videos up to 1 minute by merging multiple windows:
-The longer the video the greater the quality degradation. However the effect will be less visible if your generated video reuses mostly non altered control video.
-
-### How It Works
-- Each window uses corresponding time segment from control video
-- Example: 0-4s control video → first window, 4-8s → second window, etc.
-- Automatic overlap management ensures smooth transitions
-
-
-### Formula
-```
-Generated Frames = [Windows - 1] × [Window Size - Overlap - Discard] + Window Size
-```
-
-### Multi-Line Prompts (Experimental)
-- Each line of prompt used for different window
-- If more windows than prompt lines, last line repeats
-- Separate lines with carriage return
-
-## Advanced Features
-
-### Extend Video
-Click "Extend the Video Sample, Please!" during generation to add more windows dynamically. This can be useful, if you don't ask for many frames to generated initially and are happy the video parts already generated.
-
-### Frame Truncation
-Automatically remove lower-quality final frames from each window (recommended: 4 frames for VACE 1.3B).
 
 ## External Resources
 

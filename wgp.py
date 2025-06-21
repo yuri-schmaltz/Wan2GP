@@ -4140,7 +4140,7 @@ def process_tasks(state):
                 gen["prompt"] = ""
                 gen["status_display"] =  False
 
-                raise gr.Error(data, print_exception= False)
+                raise gr.Error(data, print_exception= False, duration = 0)
             elif cmd == "status":
                 gen["status"] = data
             elif cmd == "output":
@@ -5308,7 +5308,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     video_guide_outpainting_value = ui_defaults.get("video_guide_outpainting","#")
                     video_guide_outpainting = gr.Text(value=video_guide_outpainting_value , visible= False)
                     with gr.Group():
-                        video_guide_outpainting_checkbox = gr.Checkbox(label="Enable Outpainting on Control Video or Injected Reference Frames", value=len(video_guide_outpainting_value)>0 and not video_guide_outpainting_value.startswith("#") )
+                        video_guide_outpainting_checkbox = gr.Checkbox(label="Enable Spatial Outpainting on Control Video or Injected Reference Frames", value=len(video_guide_outpainting_value)>0 and not video_guide_outpainting_value.startswith("#") )
                         with gr.Row(visible = not video_guide_outpainting_value.startswith("#")) as video_guide_outpainting_row:
                             video_guide_outpainting_value = video_guide_outpainting_value[1:] if video_guide_outpainting_value.startswith("#") else video_guide_outpainting_value
                             video_guide_outpainting_list = [0] * 4 if len(video_guide_outpainting_value) == 0 else [int(v) for v in video_guide_outpainting_value.split(" ")]

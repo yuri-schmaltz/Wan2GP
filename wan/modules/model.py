@@ -944,7 +944,6 @@ class WanModel(ModelMixin, ConfigMixin):
         if torch.is_tensor(freqs) and freqs.device != device:
             freqs = freqs.to(device)
 
-
         x_list = x
         joint_pass = len(x_list) > 1
         is_source_x = [ x.data_ptr() == x_list[0].data_ptr() and i > 0 for i, x in enumerate(x_list) ]
