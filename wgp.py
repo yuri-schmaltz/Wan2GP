@@ -6295,10 +6295,10 @@ def set_new_tab(tab_state, new_tab_no):
         else:
             vmc_event_handler(True)
     tab_state["tab_no"] = new_tab_no
+    return gr.Tabs() 
 
 def select_tab(tab_state, evt:gr.SelectData):
-    set_new_tab(tab_state, evt.index)
-    return gr.Tabs() 
+    return set_new_tab(tab_state, evt.index)
 
 def get_js():
     start_quit_timer_js = """
