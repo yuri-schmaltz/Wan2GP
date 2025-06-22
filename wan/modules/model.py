@@ -292,8 +292,9 @@ class WanI2VCrossAttention(WanSelfAttention):
                  num_heads,
                  window_size=(-1, -1),
                  qk_norm=True,
-                 eps=1e-6):
-        super().__init__(dim, num_heads, window_size, qk_norm, eps)
+                 eps=1e-6,
+                 block_no=0):
+        super().__init__(dim, num_heads, window_size, qk_norm, eps, block_no)
 
         self.k_img = nn.Linear(dim, dim)
         self.v_img = nn.Linear(dim, dim)
@@ -971,7 +972,7 @@ class WanModel(ModelMixin, ConfigMixin):
 
         chipmunk = offload.shared_state.get("_chipmunk", False) 
         if chipmunk:
-            from src.chipmunk.ops.voxel import voxel_chunk_no_padding, reverse_voxel_chunk_no_padding
+            from chipmunk.ops.voxel import voxel_chunk_no_padding, reverse_voxel_chunk_no_padding
             voxel_shape = (4, 6, 8)
 
         x_list = x
