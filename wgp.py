@@ -1772,7 +1772,7 @@ def fix_settings(model_type, ui_defaults):
         if not "I" in video_prompt_type:  # workaround for settings corruption
             video_prompt_type += "I" 
     if model_type in ["hunyuan"]:
-        del_in_sequence(video_prompt_type, "I")
+        video_prompt_type = video_prompt_type.replace("I", "")
     ui_defaults["video_prompt_type"] = video_prompt_type
 
 def get_default_settings(model_type):
@@ -1990,7 +1990,9 @@ def save_quantized_model(model, model_type, model_filename, dtype,  config_file)
         pos = model_filename.rfind(".")
         model_filename =  model_filename[:pos] + "_quanto_int8" + model_filename[pos+1:] 
     
-    if not os.path.isfile(model_filename):
+    if os.path.isfile(model_filename):
+        print(f"There isn't any model to quantize as quantized model '{model_filename}' aready exists")
+    else:
         offload.save_model(model, model_filename, do_quantize= True, config_file_path=config_file)
         print(f"New quantized file '{model_filename}' had been created for finetune Id '{model_type}'.")
         finetune_def = get_model_finetune_def(model_type)
@@ -2360,10 +2362,18 @@ def load_models(model_type):
     preload =int(args.preload)
     save_quantized = args.save_quantized and finetune_def != None
     model_filename = get_model_filename(model_type=model_type, quantization= "" if save_quantized else transformer_quantization, dtype_policy = transformer_dtype_policy) 
+    modules = finetune_def.get("modules", []) if finetune_def != None else []
     if save_quantized and "quanto" in model_filename:
         save_quantized = False
         print("Need to provide a non quantized model to create a quantized model to be saved") 
-    quantizeTransformer = not save_quantized and finetune_def !=None and transformer_quantization in ("int8", "fp8") and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename         
+    if save_quantized and len(modules) > 0:
+        _, model_types_no_module =  dependent_models_types = get_dependent_models(base_model_type, transformer_quantization, transformer_dtype_policy) 
+        print(f"Unable to create a finetune quantized model as some modules are declared in the finetune definition. If your finetune includes already the module weights you can remove the 'modules' entry and try again. If not you will need also to change temporarly the model 'architecture' to an architecture that wont require the modules part ('{model_types_no_module[0] if len(model_types_no_module)>0 else ''}' ?) to quantize and then add back the original 'modules' and 'architecture' entries.")
+        save_quantized = False
+    quantizeTransformer = not save_quantized and finetune_def !=None and transformer_quantization in ("int8", "fp8") and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename
+    if quantizeTransformer and len(modules) > 0:
+        print(f"Autoquantize is not yet supported if some modules are declared")
+        quantizeTransformer = False
     model_family = get_model_family(model_type)
     transformer_dtype = get_transformer_dtype(model_family, transformer_dtype_policy)
     if quantizeTransformer or "quanto" in model_filename:
@@ -2379,16 +2389,14 @@ def load_models(model_type):
     model_file_list = dependent_models + [model_filename]
     model_type_list = dependent_models_types + [model_type]
     new_transformer_filename = model_file_list[-1] 
-    if finetune_def != None:
-        for module_type in finetune_def.get("modules", []):
-            model_file_list.append(get_model_filename(module_type, transformer_quantization, transformer_dtype))
-            model_type_list.append(module_type)
+    for module_type in modules:
+        model_file_list.append(get_model_filename(module_type, transformer_quantization, transformer_dtype))
+        model_type_list.append(module_type)
 
     for filename, file_model_type in zip(model_file_list, model_type_list): 
         download_models(filename, file_model_type)
     VAE_dtype = torch.float16 if server_config.get("vae_precision","16") == "16" else torch.float
     mixed_precision_transformer =  server_config.get("mixed_precision","0") == "1"
-    transformer_filename = None
     transformer_loras_filenames = None
     transformer_type = None
     for i, filename in enumerate(model_file_list):
@@ -5317,9 +5325,9 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             video_guide_outpainting_left = gr.Slider(0, 100, value= video_guide_outpainting_list[2], step=5, label="Left %", show_reset_button= False)
                             video_guide_outpainting_right = gr.Slider(0, 100, value= video_guide_outpainting_list[3], step=5, label="Right %", show_reset_button= False)
 
-                video_mask = gr.Video(label= "Video Mask Area (for Inpainting, white = Control Area, black = Unchanged)", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value , value= ui_defaults.get("video_mask", None)) 
+                video_mask = gr.Video(label= "Video Mask Area (for Inpainting, white = Control Area, black = Unchanged)", visible= "V" in video_prompt_type_value and "A" in video_prompt_type_value and not "U" in video_prompt_type_value , value= ui_defaults.get("video_mask", None)) 
 
-                mask_expand = gr.Slider(-10, 50, value=ui_defaults.get("mask_expand", 0), step=1, label="Expand / Shrink Mask Area", visible= "A" in video_prompt_type_value and not "U" in video_prompt_type_value )
+                mask_expand = gr.Slider(-10, 50, value=ui_defaults.get("mask_expand", 0), step=1, label="Expand / Shrink Mask Area", visible= "V" in video_prompt_type_value and "A" in video_prompt_type_value and not "U" in video_prompt_type_value )
 
                 image_refs = gr.Gallery( label ="Start Image" if hunyuan_video_avatar else "Reference Images",
                         type ="pil",   show_label= True,

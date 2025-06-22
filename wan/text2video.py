@@ -108,7 +108,7 @@ class WanT2V:
 
         self.sample_neg_prompt = config.sample_neg_prompt
 
-        if "Vace" in model_filename[-1]:
+        if base_model_type in ["vace_14B", "vace_1.3B"]:
             self.vid_proc = VaceVideoProcessor(downsample=tuple([x * y for x, y in zip(config.vae_stride, self.patch_size)]),
                                             min_area=480*832,
                                             max_area=480*832,
@@ -492,16 +492,10 @@ class WanT2V:
         if callback != None:
             callback(-1, None, True)
 
-        # seq_shape = (21, 45, 80)
-        # local_heads_num = 40 #12 for 1.3B
-
-        # self.model.blocks[0].self_attn.attn.initialize_static_mask(
-        #     seq_shape=seq_shape,
-        #     txt_len=0,
-        #     local_heads_num=local_heads_num,
-        #     device='cuda'
-        # )
-        # self.model.blocks[0].self_attn.attn.layer_counter.reset()
+        offload.shared_state["_chipmunk"] =  False
+        chipmunk = offload.shared_state.get("_chipmunk", False)        
+        if chipmunk:
+            self.model.setup_chipmunk()
 
         for i, t in enumerate(tqdm(timesteps)):
 
@@ -614,6 +608,9 @@ class WanT2V:
 
         x0 = [latents]
 
+        if chipmunk:
+            self.model.release_chipmunk() # need to add it at every exit when in prof
+
         if return_latent_slice != None:
             if overlapped_latents != None:
                 # latents [:, 1:] = self.toto
@@ -641,5 +638,3 @@ class WanT2V:
             target = modules_dict[f"blocks.{model_layer}"]
             setattr(target, "vace", module )
         delattr(model, "vace_blocks")
-
- 
