@@ -2873,7 +2873,7 @@ def process_images_multithread(image_processor, items, process_type, wrap_in_lis
     
     import concurrent.futures
     start_time = time.time()
-    print(f"Preprocessus:{process_type} started")
+    # print(f"Preprocessus:{process_type} started")
     if process_type in ["prephase", "upsample"]: 
         if wrap_in_list :
             items = [ [img] for img in items]
@@ -2890,7 +2890,7 @@ def process_images_multithread(image_processor, items, process_type, wrap_in_lis
         results=  image_processor(items) 
 
     end_time = time.time()
-    print(f"duration:{end_time-start_time:.1f}")
+    # print(f"duration:{end_time-start_time:.1f}")
 
     return results  
 
