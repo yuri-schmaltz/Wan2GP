@@ -20,6 +20,16 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
 
 ## 🔥 Latest Updates
+### June 23 2025: WanGP v6.3, Vace Unleashed. Thought we couldnt squeeze Vace even more ?
+- Multithreaded preprocessing when possible for faster generations
+- Multithreaded frames Lanczos Upsampling as a bonus
+- A new Vace preprocessor : *Flow* to extract fluid motion
+- Multi Vace Controlnets: you can now transfer several properties at the same time. This opens new possibilities to explore, for instance if you transfer *Human Movement* and *Shapes* at the same time for some reasons the lighting of your character will take into account much more the environment of your character.
+- Injected Frames Outpainting, in case you missed it in WanGP 6.21
+
+Don't know how to use all of the Vace features ? Check the Vace Guide embedded in WanGP as it has also been updated.
+
+
 ### June 19 2025: WanGP v6.2, Vace even more Powercharged
 👋 Have I told you that I am a big fan of Vace ? Here are more goodies to unleash its power: 
 - If you ever wanted to watch Star Wars in 4:3, just use the new *Outpainting* feature and it will add the missing bits of image at the top and the bottom of the screen. The best thing is *Outpainting* can be combined with all the other Vace modifications, for instance you can change the main character of your favorite movie at the same time  

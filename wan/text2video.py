@@ -132,7 +132,7 @@ class WanT2V:
             inactive = [i * (1 - m) + 0 * m for i, m in zip(frames, masks)]
             reactive = [i * m + 0 * (1 - m) for i, m in zip(frames, masks)]
             inactive = self.vae.encode(inactive, tile_size = tile_size)
-            self.toto = inactive[0].clone() 
+
             if overlapped_latents  != None  : 
                 # inactive[0][:, 0:1] = self.vae.encode([frames[0][:, 0:1]], tile_size = tile_size)[0] # redundant
                 inactive[0][:, 1:overlapped_latents.shape[1] + 1] = overlapped_latents
@@ -220,7 +220,7 @@ class WanT2V:
             ref_img = white_canvas
         return ref_img.to(device)
 
-    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, original_video = False, keep_frames= [], start_frame = 0,  fit_into_canvas = None, pre_src_video = None, inject_frames = [], outpainting_dims = None):
+    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, keep_frames= [], start_frame = 0,  fit_into_canvas = None, pre_src_video = None, inject_frames = [], outpainting_dims = None):
         image_sizes = []
         trim_video = len(keep_frames)
         def conv_tensor(t, device):
@@ -254,7 +254,7 @@ class WanT2V:
                 image_sizes.append(image_size)
             else:
                 src_video[i] = conv_tensor(sub_src_video[:num_frames], device)
-                src_mask[i] = torch.zeros_like(src_video[i], device=device) if original_video else torch.ones_like(src_video[i], device=device)
+                src_mask[i] = torch.ones_like(src_video[i], device=device)
                 if prepend_count > 0:
                     src_video[i] =  torch.cat( [sub_pre_src_video, src_video[i]], dim=1)
                     src_mask[i] =  torch.cat( [torch.zeros_like(sub_pre_src_video), src_mask[i]] ,1)
@@ -278,15 +278,15 @@ class WanT2V:
             if ref_images is not None:
                 image_size = image_sizes[i]
                 for j, ref_img in enumerate(ref_images):
-                    if ref_img is not None:
+                    if ref_img is not None and not torch.is_tensor(ref_img):
                         src_ref_images[i][j] = self.fit_image_into_canvas(ref_img, image_size, 1, device)
         return src_video, src_mask, src_ref_images
 
     def decode_latent(self, zs, ref_images=None, tile_size= 0 ):
         if ref_images is None:
             ref_images = [None] * len(zs)
-        else:
-            assert len(zs) == len(ref_images)
+        # else:
+        #     assert len(zs) == len(ref_images)
 
         trimed_zs = []
         for z, refs in zip(zs, ref_images):
@@ -312,7 +312,7 @@ class WanT2V:
                 input_ref_images = None,      
                 input_video=None,
                 target_camera=None,                  
-                context_scale=1.0,
+                context_scale=None,
                 width = 1280,
                 height = 720,
                 fit_into_canvas = True,
@@ -477,7 +477,8 @@ class WanT2V:
             kwargs.update({'cam_emb': cam_emb})
 
         if vace:
-            ref_images_count = len(input_ref_images[0]) if input_ref_images != None and input_ref_images[0] != None else 0 
+            ref_images_count = len(input_ref_images[0]) if input_ref_images != None and input_ref_images[0] != None else 0
+            context_scale = context_scale if context_scale != None else [1.0] * len(z)
             kwargs.update({'vace_context' : z, 'vace_context_scale' : context_scale})
             if overlapped_latents != None :
                 overlapped_latents_size = overlapped_latents.shape[1] + 1

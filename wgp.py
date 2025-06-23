@@ -45,7 +45,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.4.9"
-WanGP_version = "6.21"
+WanGP_version = "6.3"
 settings_version = 2
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
@@ -429,8 +429,8 @@ def process_prompt_and_add_tasks(state, model_choice):
     return update_queue_data(queue)
 
 def get_preview_images(inputs):
-    inputs_to_query = ["image_start", "image_end", "video_guide", "image_refs","video_mask", "video_source"]
-    labels = ["Start Image", "End Image", "Video Guide", "Image Reference","Video Mask", "Video Source"]
+    inputs_to_query = ["image_start", "image_end", "video_source", "video_guide", "video_mask", "image_refs" ]
+    labels = ["Start Image", "End Image", "Video Source", "Video Guide", "Video Mask", "Image Reference"]
     start_image_data = None
     start_image_labels = []
     end_image_data = None
@@ -1768,7 +1768,7 @@ def fix_settings(model_type, ui_defaults):
         return
     
     video_prompt_type = ui_defaults.get("video_prompt_type", "")
-    if model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_custom_audio", "hunyuan_avatar", "phantom", "phantom_1.3B"]:
+    if model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_custom_audio", "hunyuan_avatar", "phantom_14B", "phantom_1.3B"]:
         if not "I" in video_prompt_type:  # workaround for settings corruption
             video_prompt_type += "I" 
     if model_type in ["hunyuan"]:
@@ -2081,8 +2081,8 @@ def download_models(model_filename, model_type):
 
     shared_def = {
         "repoId" : "DeepBeepMeep/Wan2.1",
-        "sourceFolderList" : [ "pose", "scribble", "depth", "mask", "wav2vec", ""  ],
-        "fileList" : [ ["dw-ll_ucoco_384.onnx", "yolox_l.onnx"],["netG_A_latest.pth"], ["depth_anything_v2_vitl.pth"], ["sam_vit_h_4b8939_fp16.safetensors"], ["config.json", "feature_extractor_config.json", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer_config.json", "vocab.json"],
+        "sourceFolderList" : [ "pose", "scribble", "flow", "depth", "mask", "wav2vec", ""  ],
+        "fileList" : [ ["dw-ll_ucoco_384.onnx", "yolox_l.onnx"],["netG_A_latest.pth"], ["raft-things.pth"], ["depth_anything_v2_vitl.pth","depth_anything_v2_vitb.pth"], ["sam_vit_h_4b8939_fp16.safetensors"], ["config.json", "feature_extractor_config.json", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer_config.json", "vocab.json"],
                 [ "flownet.pkl"  ] ]
     }
     process_files_def(**shared_def)
@@ -2512,6 +2512,7 @@ def apply_changes(  state,
                     enhancer_enabled_choice = 0,
                     fit_canvas_choice = 0,
                     preload_in_VRAM_choice = 0,
+                    depth_anything_v2_variant_choice = "vitl",
                     notification_sound_enabled_choice = 1,
                     notification_sound_volume_choice = 50
 ):
@@ -2540,6 +2541,7 @@ def apply_changes(  state,
         "fit_canvas": fit_canvas_choice,
         "enhancer_enabled" : enhancer_enabled_choice,
         "preload_in_VRAM" : preload_in_VRAM_choice,
+        "depth_anything_v2_variant": depth_anything_v2_variant_choice,
         "notification_sound_enabled" : notification_sound_enabled_choice,
         "notification_sound_volume" : notification_sound_volume_choice
     }
@@ -2577,7 +2579,7 @@ def apply_changes(  state,
     transformer_types = server_config["transformer_types"]
     model_filename = get_model_filename(transformer_type, transformer_quantization, transformer_dtype_policy)
     state["model_filename"] = model_filename
-    if all(change in ["attention_mode", "vae_config", "boost", "save_path", "metadata_type", "clear_file_list", "fit_canvas", "notification_sound_enabled", "notification_sound_volume"] for change in changes ):
+    if all(change in ["attention_mode", "vae_config", "boost", "save_path", "metadata_type", "clear_file_list", "fit_canvas", "depth_anything_v2_variant", "notification_sound_enabled", "notification_sound_volume"] for change in changes ):
         model_choice = gr.Dropdown()
     else:
         reload_needed = True
@@ -2818,7 +2820,7 @@ def get_preprocessor(process_type, inpaint_color):
             "POSE_MODEL": "ckpts/pose/dw-ll_ucoco_384.onnx",
             "RESIZE_SIZE": 1024
         }
-        anno_ins = lambda img: PoseBodyFaceVideoAnnotator(cfg_dict).forward(img)[0]
+        anno_ins = lambda img: PoseBodyFaceVideoAnnotator(cfg_dict).forward(img)
     elif process_type=="depth":
         # from preprocessing.midas.depth import DepthVideoAnnotator
         # cfg_dict = {
@@ -2827,30 +2829,72 @@ def get_preprocessor(process_type, inpaint_color):
         # anno_ins = lambda img: DepthVideoAnnotator(cfg_dict).forward(img)[0]
 
         from preprocessing.depth_anything_v2.depth import DepthV2VideoAnnotator
-        cfg_dict = {
-            "PRETRAINED_MODEL": "ckpts/depth/depth_anything_v2_vitl.pth"
-            # "PRETRAINED_MODEL": "ckpts/depth/depth_anything_vitb14.pth"
-            
-        }
-        anno_ins = lambda img: DepthV2VideoAnnotator(cfg_dict).forward(img)[0]
+
+        if server_config.get("depth_anything_v2_variant", "vitl") == "vitl":
+            cfg_dict = {
+                "PRETRAINED_MODEL": "ckpts/depth/depth_anything_v2_vitl.pth",
+                'MODEL_VARIANT': 'vitl'
+            }
+        else:
+            cfg_dict = {
+                "PRETRAINED_MODEL": "ckpts/depth/depth_anything_v2_vitb.pth",
+                'MODEL_VARIANT': 'vitb',
+            }
+
+        anno_ins = lambda img: DepthV2VideoAnnotator(cfg_dict).forward(img)
     elif process_type=="gray":
         from preprocessing.gray import GrayVideoAnnotator
         cfg_dict = {}
-        anno_ins = lambda img: GrayVideoAnnotator(cfg_dict).forward(img)[0]
+        anno_ins = lambda img: GrayVideoAnnotator(cfg_dict).forward(img)
     elif process_type=="scribble":
         from preprocessing.scribble import ScribbleVideoAnnotator
         cfg_dict = {
                 "PRETRAINED_MODEL": "ckpts/scribble/netG_A_latest.pth"
             }
-        anno_ins = lambda img: ScribbleVideoAnnotator(cfg_dict).forward(img)[0]
+        anno_ins = lambda img: ScribbleVideoAnnotator(cfg_dict).forward(img)
+    elif process_type=="flow":
+        from preprocessing.flow import FlowVisAnnotator
+        cfg_dict = {
+                "PRETRAINED_MODEL": "ckpts/flow/raft-things.pth"
+            }
+        anno_ins = lambda img: FlowVisAnnotator(cfg_dict).forward(img)
     elif process_type=="inpaint":
-        anno_ins = lambda img : inpaint_color
-        # anno_ins = lambda img : np.full_like(img, inpaint_color)
+        anno_ins = lambda img :  len(img) * [inpaint_color]
+    elif process_type == None or process_type in ["vace", "identity"]:
+        anno_ins = lambda img : img
     else:
-        anno_ins = lambda img : img[0]
+        raise Exception(f"process type '{process_type}' non supported")
     return anno_ins
 
-def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,  max_frames, start_frame=0, fit_canvas = False, target_fps = 16, block_size= 16, expand_scale = 2, process_type = "inpaint", to_bbox = False, RGB_Mask = False, negate_mask = False, process_outside_mask = None, inpaint_color = 127, outpainting_dims = None):
+
+def process_images_multithread(image_processor, items, process_type, wrap_in_list = True, max_workers: int = os.cpu_count()/ 2) :
+    if not items:
+       return []    
+    
+    import concurrent.futures
+    start_time = time.time()
+    print(f"Preprocessus:{process_type} started")
+    if process_type in ["prephase", "upsample"]: 
+        if wrap_in_list :
+            items = [ [img] for img in items]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(image_processor, img): idx for idx, img in enumerate(items)}
+            results = [None] * len(items)
+            for future in concurrent.futures.as_completed(futures):
+                idx = futures[future]
+                results[idx] = future.result()
+
+        if wrap_in_list: 
+            results = [ img[0] for img in results]
+    else:
+        results=  image_processor(items) 
+
+    end_time = time.time()
+    print(f"duration:{end_time-start_time:.1f}")
+
+    return results  
+
+def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,  max_frames, start_frame=0, fit_canvas = False, target_fps = 16, block_size= 16, expand_scale = 2, process_type = "inpaint", process_type2 = None, to_bbox = False, RGB_Mask = False, negate_mask = False, process_outside_mask = None, inpaint_color = 127, outpainting_dims = None, proc_no = 1):
     from wan.utils.utils import calculate_new_dimensions, get_outpainting_frame_location, get_outpainting_full_area_dimensions
 
     def mask_to_xyxy_box(mask):
@@ -2871,14 +2915,21 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
         return None, None
     any_mask = input_mask_path != None
     pose_special = "pose" in process_type
-    if process_type == "pose_depth": process_type = "pose"
     any_identity_mask = False
     if process_type == "identity":
         any_identity_mask = True
         negate_mask = False
         process_outside_mask = None
     preproc = get_preprocessor(process_type, inpaint_color)
-    preproc2 = get_preprocessor(process_outside_mask, inpaint_color) if process_type != process_outside_mask else preproc
+    preproc2 = None
+    if process_type2 != None:
+        preproc2 = get_preprocessor(process_type2, inpaint_color) if process_type != process_type2 else preproc
+    if process_outside_mask == process_type :
+        preproc_outside = preproc
+    elif preproc2 != None and process_outside_mask == process_type2 :
+        preproc_outside = preproc2
+    else:
+        preproc_outside = get_preprocessor(process_outside_mask, inpaint_color)
     video = get_resampled_video(input_video_path, start_frame, max_frames, target_fps)
     if any_mask:
         mask_video = get_resampled_video(input_mask_path, start_frame, max_frames, target_fps)
@@ -2905,12 +2956,16 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
         num_frames = min(len(video), len(mask_video))
     else:
         num_frames = len(video)
-    masked_frames = []
-    masks = []
+
     if any_identity_mask:
         any_mask = True
 
-    for frame_idx in range(num_frames):
+    proc_list =[]
+    proc_list_outside =[]
+    proc_mask = []
+
+    # for frame_idx in range(num_frames):
+    def prep_prephase(frame_idx):
         frame = Image.fromarray(video[frame_idx].cpu().numpy()) #.asnumpy()
         frame = frame.resize((width, height), resample=Image.Resampling.LANCZOS) 
         frame = np.array(frame) 
@@ -2946,17 +3001,33 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
         else:
             target_frame = frame 
 
-        processed_img = preproc([target_frame])
-
         if any_mask:
-            if preproc2 != None:
-                frame = preproc2([frame])
-            masked_frame = np.where(mask[..., None], processed_img, frame)
+            return (target_frame, frame, mask) 
         else:
-            masked_frame = processed_img
+            return (target_frame, None, None)
 
-            
+    proc_lists = process_images_multithread(prep_prephase, [frame_idx for frame_idx in range(num_frames)], "prephase", wrap_in_list= False)
+    proc_list, proc_list_outside, proc_mask = [None] * len(proc_lists), [None] * len(proc_lists), [None] * len(proc_lists)
+    for frame_idx, frame_group in enumerate(proc_lists): 
+        proc_list[frame_idx], proc_list_outside[frame_idx], proc_mask[frame_idx] = frame_group
+    prep_prephase = None
+    video = None
+    mask_video = None
+
+    if preproc2 != None:
+        proc_list2 = process_images_multithread(preproc2, proc_list, process_type2)
+        #### to be finished ...or not
+    proc_list = process_images_multithread(preproc, proc_list, process_type)
+    if any_mask:
+        proc_list_outside = process_images_multithread(preproc_outside, proc_list_outside, process_outside_mask)
+    else:
+        proc_list_outside = proc_mask = len(proc_list) * [None]
+
+    masked_frames = []
+    masks = []
+    for frame_no, (processed_img, processed_img_outside, mask) in enumerate(zip(proc_list, proc_list_outside, proc_mask)):
         if any_mask :
+            masked_frame = np.where(mask[..., None], processed_img, processed_img_outside)
             if process_outside_mask != None:
                 mask = np.full_like(mask, 255)
             mask = torch.from_numpy(mask)
@@ -2967,6 +3038,8 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
                 full_frame[margin_top:margin_top+height, margin_left:margin_left+width] = mask
                 mask = full_frame 
             masks.append(mask)
+        else:
+            masked_frame = processed_img
 
         if isinstance(masked_frame, int):
             masked_frame= np.full( (height, width, 3), inpaint_color, dtype= np.uint8)
@@ -2981,15 +3054,18 @@ def preprocess_video_with_mask(input_video_path, input_mask_path, height, width,
             masked_frame = full_frame 
 
         masked_frames.append(masked_frame)
+        proc_list[frame_no] = proc_list_outside[frame_no] = proc_mask[frame_no] = None
+
+
     if args.save_masks:
         from preprocessing.dwpose.pose import save_one_video
         saved_masked_frames = [mask.cpu().numpy() for mask in masked_frames ]
-        save_one_video("masked_frames.mp4", saved_masked_frames, fps=target_fps, quality=8, macro_block_size=None)
+        save_one_video(f"masked_frames{'' if proc_no==1 else str(proc_no)}.mp4", saved_masked_frames, fps=target_fps, quality=8, macro_block_size=None)
         if any_mask:
             saved_masks = [mask.cpu().numpy() for mask in masks ]
             save_one_video("masks.mp4", saved_masks, fps=target_fps, quality=8, macro_block_size=None)
     preproc = None
-    preproc2 = None
+    preproc_outside = None
     gc.collect()
     torch.cuda.empty_cache()
 
@@ -3066,11 +3142,11 @@ def parse_keep_frames_video_guide(keep_frames, video_length):
             for i in range(start_range, end_range + 1):
                 frames[i] = True
         else:
-            if not is_integer(section):
+            if not is_integer(section) or int(section) == 0:
                 error =f"Invalid integer {section}"
                 break
             index = absolute(int(section))
-            frames[index] = True
+            frames[index-1] = True
 
     if len(error ) > 0:
         return [], error
@@ -3113,6 +3189,8 @@ def generate_video(
     keep_frames_video_guide,
     video_guide_outpainting,
     video_mask,
+    control_net_weight,
+    control_net_weight2,
     mask_expand,
     audio_guide,
     sliding_window_size,
@@ -3397,6 +3475,7 @@ def generate_video(
         frames_already_processed = None
         pre_video_guide = None
         overlapped_latents = None
+        context_scale = None
         window_no = 0
         extra_windows = 0
         guide_start_frame = 0
@@ -3496,60 +3575,48 @@ def generate_video(
                 if len(error) > 0:
                     raise gr.Error(f"invalid keep frames {keep_frames_video_guide}")
                 keep_frames_parsed = keep_frames_parsed[guide_start_frame: guide_start_frame + current_video_length]
-
+                context_scale = [ control_net_weight]
                 if "V" in video_prompt_type:
-                    extra_label = ""
-                    if "X" in video_prompt_type:
-                        process_outside_mask = "inpaint"
-                    elif "Y" in video_prompt_type:
-                        process_outside_mask = "depth"
-                        extra_label = " and Depth"
-                    elif "W" in video_prompt_type:
-                        process_outside_mask = "scribble"
-                        extra_label = " and Shapes"
-                    else:
-                        process_outside_mask = None
-                    preprocess_type = None
-                    if "P" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,f"Extracting Open Pose{extra_label} Information")]
-                        preprocess_type = "pose"
-                    elif "D" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,"Extracting Depth Information")]
-                        preprocess_type = "depth"
-                    elif "S" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,"Extracting Shapes Information")]
-                        preprocess_type = "scribble"
-                    elif "C" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,f"Extracting Gray Level{extra_label} Information")]
-                        preprocess_type = "gray"
-                    elif "M" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,f"Creating Inpainting{extra_label} Mask")]
-                        preprocess_type = "inpaint"
-                    elif "U" in video_prompt_type :
-                        progress_args = [0, get_latest_status(state,f"Creating Identity{extra_label} Mask")]
-                        preprocess_type = "identity"
-                    else:
-                        progress_args = [0, get_latest_status(state,f"Creating Vace Generic{extra_label} Mask")]
-                        preprocess_type = "vace"
-                    send_cmd("progress", progress_args)
-                    video_guide_copy, video_mask_copy = preprocess_video_with_mask(video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= len(keep_frames_parsed) if guide_start_frame == 0 else len(keep_frames_parsed) - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps,  process_type = preprocess_type, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims )
+                    process_map = { "Y" : "depth", "W": "scribble", "X": "inpaint", "Z": "flow"}
+                    process_outside_mask = process_map.get(filter_letters(video_prompt_type, "YWX"), None)
+                    preprocess_type2 = preprocess_type = None 
+                    process_map = { "D" : "depth", "P": "pose", "S": "scribble", "F": "flow", "C": "gray", "M": "inpaint", "U": "identity"}
+                    for process_num, process_letter in  enumerate( filter_letters(video_prompt_type, "PDSFCMU")):
+                        if process_num == 0:
+                            preprocess_type = process_map.get(process_letter, "vace")
+                        else:
+                            preprocess_type2 = process_map.get(process_letter, None)
+                    process_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "U": "Identity Mask", "vace" : "Vace Data"}
+                    status_info = "Extracting " + process_names[preprocess_type]
+                    extra_process_list = ([] if preprocess_type2==None else [preprocess_type2]) + ([] if process_outside_mask==None or process_outside_mask == preprocess_type else [process_outside_mask])
+                    if len(extra_process_list) == 1:
+                        status_info += " and " + process_names[extra_process_list[0]]
+                    elif len(extra_process_list) == 2:
+                        status_info +=  ", " + process_names[extra_process_list[0]] + " and " + process_names[extra_process_list[1]]                    
+                    send_cmd("progress", [0, get_latest_status(state, status_info)])
+                    video_guide_copy, video_mask_copy = preprocess_video_with_mask(video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= len(keep_frames_parsed) if guide_start_frame == 0 else len(keep_frames_parsed) - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps,  process_type = preprocess_type, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims, proc_no =1 )
+                    video_guide_copy2 = video_mask_copy2 = None
+                    if preprocess_type2 != None:
+                        video_guide_copy2, video_mask_copy2 = preprocess_video_with_mask(video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= len(keep_frames_parsed) if guide_start_frame == 0 else len(keep_frames_parsed) - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps,  process_type = preprocess_type2, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims, proc_no =2 )
+
                     if video_guide_copy != None:
                         if sample_fit_canvas != None:
                             image_size = video_guide_copy.shape[-3: -1]
                             sample_fit_canvas = None
                         refresh_preview["video_guide"] = Image.fromarray(video_guide_copy[0].cpu().numpy())
+                        if video_guide_copy2 != None:
+                            refresh_preview["video_guide"] = [refresh_preview["video_guide"], Image.fromarray(video_guide_copy2[0].cpu().numpy())] 
                         if video_mask_copy != None:                        
                             refresh_preview["video_mask"] = Image.fromarray(video_mask_copy[0].cpu().numpy())
                 frames_to_inject_parsed = frames_to_inject[guide_start_frame: guide_start_frame + current_video_length]
 
-                src_video, src_mask, src_ref_images = wan_model.prepare_source([video_guide_copy],
-                                                                        [video_mask_copy],
-                                                                        [image_refs_copy], 
+                src_video, src_mask, src_ref_images = wan_model.prepare_source([video_guide_copy] if video_guide_copy2 == None else [video_guide_copy, video_guide_copy2],
+                                                                        [video_mask_copy] if video_guide_copy2 == None else [video_mask_copy, video_mask_copy2],
+                                                                        [image_refs_copy] if video_guide_copy2 == None else [image_refs_copy, image_refs_copy], 
                                                                         current_video_length, image_size = image_size, device ="cpu",
-                                                                        original_video= "O" in video_prompt_type,
                                                                         keep_frames=keep_frames_parsed,
                                                                         start_frame = guide_start_frame,
-                                                                        pre_src_video = [pre_video_guide],
+                                                                        pre_src_video = [pre_video_guide] if video_guide_copy2 == None else [pre_video_guide, pre_video_guide],
                                                                         fit_into_canvas = sample_fit_canvas,
                                                                         inject_frames= frames_to_inject_parsed,
                                                                         outpainting_dims = outpainting_dims,
@@ -3567,7 +3634,7 @@ def generate_video(
 
                 send_cmd("progress", progress_args)
                 src_video, src_mask = preprocess_video_with_mask(video_guide,  video_mask, height=height, width = width, max_frames= current_video_length if window_no == 1 else current_video_length - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps, process_type= "pose" if "P" in video_prompt_type else "inpaint", negate_mask = "N" in video_prompt_type, inpaint_color =0)
-                refresh_preview["video_guide"] = Image.fromarray(src_video[0].cpu().numpy())
+                refresh_preview["video_guide"] = Image.fromarray(src_video[0].cpu().numpy()) 
                 if src_mask != None:                        
                     refresh_preview["video_mask"] = Image.fromarray(src_mask[0].cpu().numpy())
             if len(refresh_preview) > 0:
@@ -3632,6 +3699,7 @@ def generate_video(
                     audio_proj= audio_proj_split,
                     audio_scale= audio_scale,
                     audio_context_lens= audio_context_lens,
+                    context_scale = context_scale,
                     ar_step = model_mode, #5
                     causal_block_size = 5,
                     causal_attention = True,
@@ -3768,15 +3836,12 @@ def generate_video(
                     w *= scale
                     h = int(h)
                     w = int(w)
-                    new_frames =[]
-                    for i in range( sample.shape[1] ):
-                        frame = sample[:, i]
-                        frame = resize_lanczos(frame, h, w)
-                        frame = frame.unsqueeze(1)
-                        new_frames.append(frame)
-                    sample = torch.cat(new_frames, dim=1)
-                    new_frames = None
-                    sample = sample * 2 - 1
+                    frames_to_upsample = [sample[:, i] for i in range( sample.shape[1]) ] 
+                    def upsample_frames(frame):
+                        return resize_lanczos(frame, h, w).unsqueeze(1)
+                    sample = torch.cat(process_images_multithread(upsample_frames, frames_to_upsample, "upsample", wrap_in_list = False), dim=1)
+                    frames_to_upsample = None
+                    sample.mul_(2).sub_(1) 
 
                 if sliding_window :
                     if frames_already_processed == None:
@@ -4764,6 +4829,8 @@ def save_inputs(
             video_guide,
             keep_frames_video_guide,
             video_mask,
+            control_net_weight,
+            control_net_weight2,
             mask_expand,
             audio_guide,
             sliding_window_size,
@@ -4955,13 +5022,13 @@ def refresh_video_prompt_type_image_refs(state, video_prompt_type, video_prompt_
     return video_prompt_type, gr.update(visible = visible),gr.update(visible = visible), gr.update(visible = visible and "F" in video_prompt_type_image_refs), gr.update(visible= ("F" in video_prompt_type_image_refs or "V" in video_prompt_type) and vace )
 
 def refresh_video_prompt_type_video_mask(video_prompt_type, video_prompt_type_video_mask):
-    video_prompt_type = del_in_sequence(video_prompt_type, "XWYNA")
+    video_prompt_type = del_in_sequence(video_prompt_type, "XYZWNA")
     video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_video_mask)
     visible= "A" in video_prompt_type     
     return video_prompt_type, gr.update(visible= visible), gr.update(visible= visible )
 
 def refresh_video_prompt_type_video_guide(state, video_prompt_type, video_prompt_type_video_guide):
-    video_prompt_type = del_in_sequence(video_prompt_type, "DSPCMUV")
+    video_prompt_type = del_in_sequence(video_prompt_type, "PDSFCMUV")
     video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_video_guide)
     visible = "V" in video_prompt_type
     mask_visible = visible and "A" in video_prompt_type and not "U" in video_prompt_type
@@ -5242,12 +5309,19 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Transfer Human Motion", "PV"),
                                 ("Transfer Depth", "DV"),
                                 ("Transfer Shapes", "SV"),
+                                ("Transfer Flow", "FV"),
                                 ("Recolorize", "CV"),
-                                ("Inpainting", "MV"),
-                                ("Vace raw format", "V"),
+                                ("Perform Inpainting", "MV"),
+                                ("Use Vace raw format", "V"),
                                 ("Keep Unchanged", "UV"),
-                            ],
-                            value=filter_letters(video_prompt_type_value, "DSPCMUV"),
+                                ("Transfer Human Motion & Depth", "PDV"),
+                                ("Transfer Human Motion & Shape", "PSV"),
+                                ("Transfer Human Motion & Flow", "PFV"),
+                                ("Transfer Depth & Shape", "DSV"),
+                                ("Transfer Depth & Flow", "DFV"),
+                                ("Transfer Shapes & Flow", "SFV"),
+                           ],
+                            value=filter_letters(video_prompt_type_value, "PDSFCMUV"),
                             label="Control Video Process", scale = 2, visible= True
                         )
                     elif hunyuan_video_custom_edit:
@@ -5256,7 +5330,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Inpaint Control Video", "MV"),
                                 ("Transfer Human Motion", "PMV"),
                             ],
-                            value=filter_letters(video_prompt_type_value, "DSPCMUV"),
+                            value=filter_letters(video_prompt_type_value, "PDSFCMUV"),
                             label="Video to Video", scale = 3, visible= True
                         )
                     else:
@@ -5286,8 +5360,10 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Non Masked Area, rest Depth", "YNA"),
                                 ("Masked Area, rest Shapes", "WA"),
                                 ("Non Masked Area, rest Shapes", "WNA"),
+                                ("Masked Area, rest Flow", "ZA"),
+                                ("Non Masked Area, rest Flow", "ZNA"),
                             ],
-                            value= filter_letters(video_prompt_type_value, "XYWNA"),
+                            value= filter_letters(video_prompt_type_value, "XYZWNA"),
                             visible=  "V" in video_prompt_type_value and not "U" in video_prompt_type_value and not hunyuan_video_custom,
                             label="Area Processed", scale = 2
                         )
@@ -5466,6 +5542,9 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             audio_guidance_scale = gr.Slider(1.0, 20.0, value=ui_defaults.get("audio_guidance_scale",5), step=0.5, label="Audio Guidance", visible=fantasy)
                             embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale", visible=(hunyuan_t2v or hunyuan_i2v))
                             flow_shift = gr.Slider(0.0, 25.0, value=ui_defaults.get("flow_shift",3), step=0.1, label="Shift Scale") 
+                        with gr.Row(visible = vace):
+                            control_net_weight = gr.Slider(0.0, 2.0, value=ui_defaults.get("control_net_weight",1), step=0.1, label="Control Net Weight #1", visible=vace)
+                            control_net_weight2 = gr.Slider(0.0, 2.0, value=ui_defaults.get("control_net_weight2",1), step=0.1, label="Control Net Weight #2", visible=vace)
                         with gr.Row():
                             negative_prompt = gr.Textbox(label="Negative Prompt", value=ui_defaults.get("negative_prompt", "") )
                 with gr.Tab("Loras"):
@@ -6144,6 +6223,15 @@ def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhan
                     interactive= not lock_ui_compile
                 )              
 
+                depth_anything_v2_variant_choice = gr.Dropdown(
+                    choices=[
+                        ("Large (more precise but 2x slower)", "vitl"),
+                        ("Big (less precise, less VRAM needed but faster)", "vitb"),
+                    ],
+                    value= server_config.get("depth_anything_v2_variant", "vitl"),
+                    label="Depth Anything v2 Vace Preprocessor Model type",
+                )              
+
                 vae_config_choice = gr.Dropdown(
                     choices=[
                 ("Auto", 0),
@@ -6224,6 +6312,7 @@ def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhan
                     enhancer_enabled_choice,
                     fit_canvas_choice,
                     preload_in_VRAM_choice,
+                    depth_anything_v2_variant_choice,
                     notification_sound_enabled_choice,
                     notification_sound_volume_choice
                 ],

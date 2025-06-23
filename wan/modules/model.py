@@ -417,7 +417,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         hints= None, 
-        context_scale=1.0,
+        context_scale=[1.0],
         cam_emb= None,
         block_mask = None,
         audio_proj= None,
@@ -431,7 +431,7 @@ class WanAttentionBlock(nn.Module):
             grid_sizes(Tensor): Shape [B, 3], the second dimension contains (F, H, W)
             freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
         """
-        hint = None
+        hints_processed = None
         attention_dtype =  self.self_attn.q.weight.dtype 
         dtype = x.dtype
 
@@ -442,10 +442,13 @@ class WanAttentionBlock(nn.Module):
                 "context" : context,
                 "e" : e,
             }
-            if self.block_id == 0:
-                hint = self.vace(hints, x, **kwargs)
-            else:
-                hint = self.vace(hints, None, **kwargs)
+            hints_processed= []
+            for scale, hint in zip(context_scale, hints):
+                if scale == 0:
+                    hints_processed.append(None)
+                else:
+                    hints_processed.append(self.vace(hint, x, **kwargs) if self.block_id == 0 else self.vace(hint, None, **kwargs))
+                     
         latent_frames = e.shape[0]
         e = (self.modulation + e).chunk(6, dim=1)
         # self-attention
@@ -506,11 +509,13 @@ class WanAttentionBlock(nn.Module):
         x.addcmul_(y, e[5])
         x, y = reshape_latent(x , 1), reshape_latent(y , 1)
 
-        if hint is not None:
-            if context_scale == 1:
-                x.add_(hint)
-            else:
-                x.add_(hint, alpha= context_scale)
+        if hints_processed is not None:
+            for hint, scale in zip(hints_processed, context_scale):
+                if scale != 0:
+                    if scale == 1:
+                        x.add_(hint)
+                    else:
+                        x.add_(hint, alpha= scale)
         return x 
 
 
@@ -605,8 +610,8 @@ class MLPProj(torch.nn.Module):
 
 class WanModel(ModelMixin, ConfigMixin):
     def setup_chipmunk(self):
-        from chipmunk.util import LayerCounter
-        from chipmunk.modules import SparseDiffMlp, SparseDiffAttn
+        # from chipmunk.util import LayerCounter
+        # from chipmunk.modules import SparseDiffMlp, SparseDiffAttn
         seq_shape = (21, 45, 80)
         chipmunk_layers =[]
         for i in range(self.num_layers):
@@ -941,7 +946,7 @@ class WanModel(ModelMixin, ConfigMixin):
         t,
         context,
         vace_context = None,
-        vace_context_scale=1.0,        
+        vace_context_scale=[1.0],        
         clip_fea=None,
         y=None,
         freqs = None,
@@ -972,7 +977,7 @@ class WanModel(ModelMixin, ConfigMixin):
 
         chipmunk = offload.shared_state.get("_chipmunk", False) 
         if chipmunk:
-            from chipmunk.ops.voxel import voxel_chunk_no_padding, reverse_voxel_chunk_no_padding
+            # from chipmunk.ops.voxel import voxel_chunk_no_padding, reverse_voxel_chunk_no_padding
             voxel_shape = (4, 6, 8)
 
         x_list = x
@@ -1065,10 +1070,10 @@ class WanModel(ModelMixin, ConfigMixin):
             # Vace embeddings
             c = [self.vace_patch_embedding(u.to(self.vace_patch_embedding.weight.dtype).unsqueeze(0)) for u in vace_context]
             c = [u.flatten(2).transpose(1, 2) for u in c]
-            c = c[0]
- 
+            # c = c[0]
+            c = [ [sub_c] for sub_c in c]
             kwargs['context_scale'] = vace_context_scale
-            hints_list = [ [c] for _ in range(len(x_list)) ] 
+            hints_list = [ c ]* len(x_list) 
             del c
 
         should_calc = True
