@@ -3576,6 +3576,7 @@ def generate_video(
                     raise gr.Error(f"invalid keep frames {keep_frames_video_guide}")
                 keep_frames_parsed = keep_frames_parsed[guide_start_frame: guide_start_frame + current_video_length]
                 context_scale = [ control_net_weight]
+                video_guide_copy2 = video_mask_copy2 = None
                 if "V" in video_prompt_type:
                     process_map = { "Y" : "depth", "W": "scribble", "X": "inpaint", "Z": "flow"}
                     process_outside_mask = process_map.get(filter_letters(video_prompt_type, "YWX"), None)
@@ -3595,7 +3596,6 @@ def generate_video(
                         status_info +=  ", " + process_names[extra_process_list[0]] + " and " + process_names[extra_process_list[1]]                    
                     send_cmd("progress", [0, get_latest_status(state, status_info)])
                     video_guide_copy, video_mask_copy = preprocess_video_with_mask(video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= len(keep_frames_parsed) if guide_start_frame == 0 else len(keep_frames_parsed) - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps,  process_type = preprocess_type, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims, proc_no =1 )
-                    video_guide_copy2 = video_mask_copy2 = None
                     if preprocess_type2 != None:
                         video_guide_copy2, video_mask_copy2 = preprocess_video_with_mask(video_guide, video_mask, height=image_size[0], width = image_size[1], max_frames= len(keep_frames_parsed) if guide_start_frame == 0 else len(keep_frames_parsed) - reuse_frames, start_frame = guide_start_frame, fit_canvas = sample_fit_canvas, target_fps = fps,  process_type = preprocess_type2, expand_scale = mask_expand, RGB_Mask = True, negate_mask = "N" in video_prompt_type, process_outside_mask = process_outside_mask, outpainting_dims = outpainting_dims, proc_no =2 )
 
@@ -5354,7 +5354,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Whole Frame", ""),
                                 ("Masked Area", "A"),
                                 ("Non Masked Area", "NA"),
-                                ("Masked Area, rest Outpainted", "XA"),
+                                ("Masked Area, rest Inpainted", "XA"),
                                 ("Non Masked Area, rest Inpainted", "XNA"),
                                 ("Masked Area, rest Depth", "YA"),
                                 ("Non Masked Area, rest Depth", "YNA"),
