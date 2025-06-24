@@ -45,7 +45,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.4.9"
-WanGP_version = "6.3"
+WanGP_version = "6.31"
 settings_version = 2
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
@@ -3351,6 +3351,7 @@ def generate_video(
 
     original_image_refs = image_refs 
     frames_to_inject = []
+    any_background_ref = False
     outpainting_dims = None if video_guide_outpainting== None or len(video_guide_outpainting) == 0 or video_guide_outpainting == "0 0 0 0" or video_guide_outpainting.startswith("#") else [int(v) for v in video_guide_outpainting.split(" ")] 
 
     if image_refs != None and len(image_refs) > 0 and (hunyuan_custom or phantom or hunyuan_avatar or vace):
@@ -3368,9 +3369,9 @@ def generate_video(
                     h, w = get_outpainting_full_area_dimensions(h,w, outpainting_dims)
                 default_image_size = calculate_new_dimensions(height, width, h, w, fit_canvas)
                 fit_canvas = None
-
         if len(image_refs) > nb_frames_positions:  
             if hunyuan_avatar: remove_background_images_ref = 0
+            any_background_ref = remove_background_images_ref !=  1 
             if remove_background_images_ref > 0:
                 send_cmd("progress", [0, get_latest_status(state, "Removing Images References Background")])
             os.environ["U2NET_HOME"] = os.path.join(os.getcwd(), "ckpts", "rembg")
@@ -3620,9 +3621,17 @@ def generate_video(
                                                                         fit_into_canvas = sample_fit_canvas,
                                                                         inject_frames= frames_to_inject_parsed,
                                                                         outpainting_dims = outpainting_dims,
+                                                                        any_background_ref = any_background_ref
                                                                         )
-                if len(frames_to_inject_parsed):
-                    refresh_preview["image_refs"] = [convert_tensor_to_image(src_video[0], frame_no) for frame_no, inject in enumerate(frames_to_inject_parsed) if inject]  + image_refs[nb_frames_positions:]
+                if len(frames_to_inject_parsed) or any_background_ref:
+                    new_image_refs = [convert_tensor_to_image(src_video[0], frame_no) for frame_no, inject in enumerate(frames_to_inject_parsed) if inject]                    
+                    if any_background_ref:
+                        new_image_refs +=  [convert_tensor_to_image(image_refs_copy[0], 0)] + image_refs[nb_frames_positions+1:]
+                    else:
+                        new_image_refs +=  image_refs[nb_frames_positions:]
+                    refresh_preview["image_refs"] = new_image_refs
+                    new_image_refs = None
+
                 if sample_fit_canvas != None:
                     image_size = src_video[0].shape[-2:]
                     sample_fit_canvas = None
@@ -5315,9 +5324,9 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Use Vace raw format", "V"),
                                 ("Keep Unchanged", "UV"),
                                 ("Transfer Human Motion & Depth", "PDV"),
-                                ("Transfer Human Motion & Shape", "PSV"),
+                                ("Transfer Human Motion & Shapes", "PSV"),
                                 ("Transfer Human Motion & Flow", "PFV"),
-                                ("Transfer Depth & Shape", "DSV"),
+                                ("Transfer Depth & Shapes", "DSV"),
                                 ("Transfer Depth & Flow", "DFV"),
                                 ("Transfer Shapes & Flow", "SFV"),
                            ],
@@ -5392,7 +5401,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     video_guide_outpainting_value = ui_defaults.get("video_guide_outpainting","#")
                     video_guide_outpainting = gr.Text(value=video_guide_outpainting_value , visible= False)
                     with gr.Group():
-                        video_guide_outpainting_checkbox = gr.Checkbox(label="Enable Spatial Outpainting on Control Video or Injected Reference Frames", value=len(video_guide_outpainting_value)>0 and not video_guide_outpainting_value.startswith("#") )
+                        video_guide_outpainting_checkbox = gr.Checkbox(label="Enable Spatial Outpainting on Control Video, Background or Injected Reference Frames", value=len(video_guide_outpainting_value)>0 and not video_guide_outpainting_value.startswith("#") )
                         with gr.Row(visible = not video_guide_outpainting_value.startswith("#")) as video_guide_outpainting_row:
                             video_guide_outpainting_value = video_guide_outpainting_value[1:] if video_guide_outpainting_value.startswith("#") else video_guide_outpainting_value
                             video_guide_outpainting_list = [0] * 4 if len(video_guide_outpainting_value) == 0 else [int(v) for v in video_guide_outpainting_value.split(" ")]
@@ -5450,7 +5459,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             wizard_variables = "\n".join(variables)
                     for _ in range( PROMPT_VARS_MAX - len(prompt_vars)):
                         prompt_vars.append(gr.Textbox(visible= False, min_width=80, show_label= False))
-            with gr.Column(not advanced_prompt) as prompt_column_wizard:
+            with gr.Column(visible=not advanced_prompt) as prompt_column_wizard:
                 wizard_prompt = gr.Textbox(visible = not advanced_prompt, label=wizard_prompt_label, value=default_wizard_prompt, lines=3)
                 wizard_prompt_activated_var = gr.Text(wizard_prompt_activated, visible= False)
                 wizard_variables_var = gr.Text(wizard_variables, visible = False)
@@ -5759,7 +5768,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                       sliding_window_tab, misc_tab, prompt_enhancer_row, inference_steps_row, skip_layer_guidance_row,
                                       video_prompt_type_video_guide, video_prompt_type_video_mask, video_prompt_type_image_refs,
                                       video_guide_outpainting_col,video_guide_outpainting_top, video_guide_outpainting_bottom, video_guide_outpainting_left, video_guide_outpainting_right,
-                                      video_guide_outpainting_checkbox, video_guide_outpainting_row] # show_advanced presets_column,
+                                      video_guide_outpainting_checkbox, video_guide_outpainting_row, show_advanced] #  presets_column,
         if update_form:
             locals_dict = locals()
             gen_inputs = [state_dict if k=="state" else locals_dict[k]  for k in inputs_names] + [state_dict] + extra_inputs

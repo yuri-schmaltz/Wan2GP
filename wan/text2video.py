@@ -133,9 +133,10 @@ class WanT2V:
             reactive = [i * m + 0 * (1 - m) for i, m in zip(frames, masks)]
             inactive = self.vae.encode(inactive, tile_size = tile_size)
 
-            if overlapped_latents  != None  : 
+            if overlapped_latents  != None and False : 
                 # inactive[0][:, 0:1] = self.vae.encode([frames[0][:, 0:1]], tile_size = tile_size)[0] # redundant
-                inactive[0][:, 1:overlapped_latents.shape[1] + 1] = overlapped_latents
+                for t in inactive:
+                    t[:, 1:overlapped_latents.shape[1] + 1] = overlapped_latents
 
             reactive = self.vae.encode(reactive, tile_size = tile_size)
             latents = [torch.cat((u, c), dim=0) for u, c in zip(inactive, reactive)]
@@ -162,7 +163,7 @@ class WanT2V:
         result_masks = []
         for mask, refs in zip(masks, ref_images):
             c, depth, height, width = mask.shape
-            new_depth = int((depth + 3) // self.vae_stride[0])
+            new_depth = int((depth + 3) // self.vae_stride[0]) # nb latents token without (ref tokens not included)
             height = 2 * (int(height) // (self.vae_stride[1] * 2))
             width = 2 * (int(width) // (self.vae_stride[2] * 2))
 
@@ -189,7 +190,7 @@ class WanT2V:
     def vace_latent(self, z, m):
         return [torch.cat([zz, mm], dim=0) for zz, mm in zip(z, m)]
 
-    def fit_image_into_canvas(self, ref_img, image_size, canvas_tf_bg, device, fill_max = False, outpainting_dims = None):
+    def fit_image_into_canvas(self, ref_img, image_size, canvas_tf_bg, device, fill_max = False, outpainting_dims = None, return_mask = False):
         from wan.utils.utils import save_image
         ref_width, ref_height = ref_img.size
         if (ref_height, ref_width) == image_size and outpainting_dims  == None:
@@ -212,15 +213,24 @@ class WanT2V:
             ref_img = ref_img.resize((new_width, new_height), resample=Image.Resampling.LANCZOS) 
             ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
             if outpainting_dims != None:
-                white_canvas = torch.full((3, 1, final_height, final_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
-                white_canvas[:, :, margin_top + top:margin_top + top + new_height, margin_left + left:margin_left + left + new_width] = ref_img 
+                canvas = torch.full((3, 1, final_height, final_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
+                canvas[:, :, margin_top + top:margin_top + top + new_height, margin_left + left:margin_left + left + new_width] = ref_img 
             else:
-                white_canvas = torch.full((3, 1, canvas_height, canvas_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
-                white_canvas[:, :, top:top + new_height, left:left + new_width] = ref_img 
-            ref_img = white_canvas
-        return ref_img.to(device)
+                canvas = torch.full((3, 1, canvas_height, canvas_width), canvas_tf_bg, dtype= torch.float, device=device) # [-1, 1]
+                canvas[:, :, top:top + new_height, left:left + new_width] = ref_img 
+            ref_img = canvas
+            canvas = None
+            if return_mask:
+                if outpainting_dims != None:
+                    canvas = torch.ones((3, 1, final_height, final_width), dtype= torch.float, device=device) # [-1, 1]
+                    canvas[:, :, margin_top + top:margin_top + top + new_height, margin_left + left:margin_left + left + new_width] = 0
+                else:
+                    canvas = torch.ones((3, 1, canvas_height, canvas_width), dtype= torch.float, device=device) # [-1, 1]
+                    canvas[:, :, top:top + new_height, left:left + new_width] = 0
+                canvas = canvas.to(device)
+        return ref_img.to(device), canvas
 
-    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, keep_frames= [], start_frame = 0,  fit_into_canvas = None, pre_src_video = None, inject_frames = [], outpainting_dims = None):
+    def prepare_source(self, src_video, src_mask, src_ref_images, total_frames, image_size,  device, keep_frames= [], start_frame = 0,  fit_into_canvas = None, pre_src_video = None, inject_frames = [], outpainting_dims = None, any_background_ref = False):
         image_sizes = []
         trim_video = len(keep_frames)
         def conv_tensor(t, device):
@@ -270,16 +280,22 @@ class WanT2V:
 
             for k, frame in enumerate(inject_frames):
                 if frame != None:
-                    src_video[i][:, k:k+1] = self.fit_image_into_canvas(frame, image_size, 0, device, True, outpainting_dims)
-                    src_mask[i][:, k:k+1] = 0
+                    src_video[i][:, k:k+1], src_mask[i][:, k:k+1] = self.fit_image_into_canvas(frame, image_size, 0, device, True, outpainting_dims, return_mask= True)
         
 
+        self.background_mask = None
         for i, ref_images in enumerate(src_ref_images):
             if ref_images is not None:
                 image_size = image_sizes[i]
                 for j, ref_img in enumerate(ref_images):
                     if ref_img is not None and not torch.is_tensor(ref_img):
-                        src_ref_images[i][j] = self.fit_image_into_canvas(ref_img, image_size, 1, device)
+                        if j==0 and any_background_ref:
+                            if self.background_mask == None: self.background_mask = [None] * len(src_ref_images) 
+                            src_ref_images[i][j], self.background_mask[i] = self.fit_image_into_canvas(ref_img, image_size, 0, device, True, outpainting_dims, return_mask= True)
+                        else:
+                            src_ref_images[i][j], _ = self.fit_image_into_canvas(ref_img, image_size, 1, device)
+        if self.background_mask != None:
+            self.background_mask = [ item if item != None else self.background_mask[0] for item in self.background_mask ] # deplicate background mask with double control net since first controlnet image ref modifed by ref
         return src_video, src_mask, src_ref_images
 
     def decode_latent(self, zs, ref_images=None, tile_size= 0 ):
@@ -408,11 +424,20 @@ class WanT2V:
             input_frames = [u.to(self.device) for u in input_frames]
             input_ref_images = [ None if u == None else [v.to(self.device) for v in u]  for u in input_ref_images]
             input_masks = [u.to(self.device) for u in input_masks]
+            if self.background_mask != None: self.background_mask = [m.to(self.device) for m in self.background_mask]
             previous_latents = None
             # if overlapped_latents != None:
                 # input_ref_images = [u[-1:] for u in input_ref_images]
             z0 = self.vace_encode_frames(input_frames, input_ref_images, masks=input_masks, tile_size = VAE_tile_size, overlapped_latents = overlapped_latents )
             m0 = self.vace_encode_masks(input_masks, input_ref_images)
+            if self.background_mask != None:
+                zbg = self.vace_encode_frames([ref_img[0] for ref_img in input_ref_images], None, masks=self.background_mask, tile_size = VAE_tile_size )
+                mbg = self.vace_encode_masks(self.background_mask, None)
+                for zz0, mm0, zzbg, mmbg in zip(z0, m0, zbg, mbg):
+                    zz0[:, 0:1] = zzbg
+                    mm0[:, 0:1] = mmbg
+
+                self.background_mask = zz0 = mm0 = zzbg = mmbg = None
             z = self.vace_latent(z0, m0)
 
             target_shape = list(z0[0].shape)
@@ -499,24 +524,14 @@ class WanT2V:
             self.model.setup_chipmunk()
 
         for i, t in enumerate(tqdm(timesteps)):
-
             timestep = [t]
             if overlapped_latents != None :
-                # overlap_noise_factor = overlap_noise *(i/(len(timesteps)-1)) / 1000
                 overlap_noise_factor = overlap_noise / 1000 
-                # overlap_noise_factor = (1000-t )/ 1000  #  overlap_noise / 1000 
-                # latent_noise_factor = 1 #max(min(1,  (t - overlap_noise)  / 1000 ),0)
                 latent_noise_factor = t / 1000
-                for zz, zz_r, ll in zip(z, z_reactive, [latents]):
-                    pass
+                for zz, zz_r, ll in zip(z, z_reactive, [latents, None]): # extra None for second control net
                     zz[0:16, ref_images_count:overlapped_latents_size + ref_images_count]   = zz_r[:, ref_images_count:]  * (1.0 - overlap_noise_factor) + torch.randn_like(zz_r[:, ref_images_count:] ) * overlap_noise_factor 
-                    ll[:, 0:overlapped_latents_size + ref_images_count]   = zz_r  * (1.0 - latent_noise_factor) + torch.randn_like(zz_r ) * latent_noise_factor 
-
-            if conditioning_latents_size > 0 and overlap_noise > 0:
-                pass
-                overlap_noise_factor = overlap_noise / 1000 
-                # latents[:, conditioning_latents_size + ref_images_count:]   = latents[:, conditioning_latents_size + ref_images_count:]  * (1.0 - overlap_noise_factor) + torch.randn_like(latents[:, conditioning_latents_size + ref_images_count:]) * overlap_noise_factor 
-                # timestep = [torch.tensor([t.item()] * (conditioning_latents_size + ref_images_count) + [t.item() - overlap_noise]*(target_shape[1] - conditioning_latents_size - ref_images_count))]
+                    if ll != None:
+                        ll[:, 0:overlapped_latents_size + ref_images_count]   = zz_r  * (1.0 - latent_noise_factor) + torch.randn_like(zz_r ) * latent_noise_factor 
 
             if target_camera != None:
                 latent_model_input = torch.cat([latents, source_latents], dim=1)
