@@ -3580,9 +3580,9 @@ def generate_video(
                 if "V" in video_prompt_type:
                     process_map = { "Y" : "depth", "W": "scribble", "X": "inpaint", "Z": "flow"}
                     process_outside_mask = process_map.get(filter_letters(video_prompt_type, "YWX"), None)
-                    preprocess_type2 = preprocess_type = None 
+                    preprocess_type, preprocess_type2 =  "vace", None 
                     process_map = { "D" : "depth", "P": "pose", "S": "scribble", "F": "flow", "C": "gray", "M": "inpaint", "U": "identity"}
-                    for process_num, process_letter in  enumerate( filter_letters(video_prompt_type, "PDSFCMU")):
+                    for process_num, process_letter in enumerate( filter_letters(video_prompt_type, "PDSFCMU")):
                         if process_num == 0:
                             preprocess_type = process_map.get(process_letter, "vace")
                         else:
