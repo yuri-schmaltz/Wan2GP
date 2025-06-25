@@ -195,6 +195,7 @@ class WanT2V:
         ref_width, ref_height = ref_img.size
         if (ref_height, ref_width) == image_size and outpainting_dims  == None:
             ref_img = TF.to_tensor(ref_img).sub_(0.5).div_(0.5).unsqueeze(1)
+            canvas = torch.zeros_like(ref_img) if return_mask else None
         else:
             if outpainting_dims != None:
                 final_height, final_width = image_size
