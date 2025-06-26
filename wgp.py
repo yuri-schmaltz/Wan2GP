@@ -3582,7 +3582,7 @@ def generate_video(
                     process_map = { "Y" : "depth", "W": "scribble", "X": "inpaint", "Z": "flow"}
                     process_outside_mask = process_map.get(filter_letters(video_prompt_type, "YWX"), None)
                     preprocess_type, preprocess_type2 =  "vace", None 
-                    process_map = { "D" : "depth", "P": "pose", "S": "scribble", "F": "flow", "C": "gray", "M": "inpaint", "U": "identity"}
+                    process_map = { "D" : "depth", "P": "pose", "S": "scribble", "L": "flow", "C": "gray", "M": "inpaint", "U": "identity"}
                     for process_num, process_letter in enumerate( filter_letters(video_prompt_type, "PDSFCMU")):
                         if process_num == 0:
                             preprocess_type = process_map.get(process_letter, "vace")
@@ -5037,7 +5037,7 @@ def refresh_video_prompt_type_video_mask(video_prompt_type, video_prompt_type_vi
     return video_prompt_type, gr.update(visible= visible), gr.update(visible= visible )
 
 def refresh_video_prompt_type_video_guide(state, video_prompt_type, video_prompt_type_video_guide):
-    video_prompt_type = del_in_sequence(video_prompt_type, "PDSFCMUV")
+    video_prompt_type = del_in_sequence(video_prompt_type, "PDSLCMUV")
     video_prompt_type = add_to_sequence(video_prompt_type, video_prompt_type_video_guide)
     visible = "V" in video_prompt_type
     mask_visible = visible and "A" in video_prompt_type and not "U" in video_prompt_type
@@ -5318,19 +5318,19 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Transfer Human Motion", "PV"),
                                 ("Transfer Depth", "DV"),
                                 ("Transfer Shapes", "SV"),
-                                ("Transfer Flow", "FV"),
+                                ("Transfer Flow", "LV"),
                                 ("Recolorize", "CV"),
                                 ("Perform Inpainting", "MV"),
                                 ("Use Vace raw format", "V"),
                                 ("Keep Unchanged", "UV"),
                                 ("Transfer Human Motion & Depth", "PDV"),
                                 ("Transfer Human Motion & Shapes", "PSV"),
-                                ("Transfer Human Motion & Flow", "PFV"),
+                                ("Transfer Human Motion & Flow", "PLV"),
                                 ("Transfer Depth & Shapes", "DSV"),
-                                ("Transfer Depth & Flow", "DFV"),
-                                ("Transfer Shapes & Flow", "SFV"),
+                                ("Transfer Depth & Flow", "DLV"),
+                                ("Transfer Shapes & Flow", "SLV"),
                            ],
-                            value=filter_letters(video_prompt_type_value, "PDSFCMUV"),
+                            value=filter_letters(video_prompt_type_value, "PDSLCMUV"),
                             label="Control Video Process", scale = 2, visible= True
                         )
                     elif hunyuan_video_custom_edit:
@@ -5339,7 +5339,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("Inpaint Control Video", "MV"),
                                 ("Transfer Human Motion", "PMV"),
                             ],
-                            value=filter_letters(video_prompt_type_value, "PDSFCMUV"),
+                            value=filter_letters(video_prompt_type_value, "PDSLCMUV"),
                             label="Video to Video", scale = 3, visible= True
                         )
                     else:
