@@ -3588,7 +3588,7 @@ def generate_video(
                             preprocess_type = process_map.get(process_letter, "vace")
                         else:
                             preprocess_type2 = process_map.get(process_letter, None)
-                    process_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "U": "Identity Mask", "vace" : "Vace Data"}
+                    process_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "identity": "Identity Mask", "vace" : "Vace Data"}
                     status_info = "Extracting " + process_names[preprocess_type]
                     extra_process_list = ([] if preprocess_type2==None else [preprocess_type2]) + ([] if process_outside_mask==None or process_outside_mask == preprocess_type else [process_outside_mask])
                     if len(extra_process_list) == 1:
