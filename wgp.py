@@ -2944,6 +2944,11 @@ def select_video(state, input_file_list, event_data: gr.EventData):
         else:
             video_guidance_label = "Guidance Scale"
         video_flow_shift = configs.get("flow_shift", 1)
+        video_video_guide_outpainting = configs.get("video_guide_outpainting", "")
+        video_outpainting = ""
+        if len(video_video_guide_outpainting) > 0 and not video_video_guide_outpainting.startswith("#"):
+             video_video_guide_outpainting = video_video_guide_outpainting.split(" ")
+             video_outpainting = f"Top={video_video_guide_outpainting[0]}%, Bottom={video_video_guide_outpainting[1]}%, Left={video_video_guide_outpainting[2]}%, Right={video_video_guide_outpainting[3]}%" 
         video_num_inference_steps = configs.get("num_inference_steps", 0)
         video_creation_date = str(get_file_creation_date(file_name))
         if "." in video_creation_date: video_creation_date = video_creation_date[:video_creation_date.rfind(".")]
@@ -2959,6 +2964,9 @@ def select_video(state, input_file_list, event_data: gr.EventData):
         if len(video_other_prompts) >0 :
             values += [video_other_prompts]
             labels += ["Other Prompts"]
+        if len(video_outpainting) >0 :
+            values += [video_outpainting]
+            labels += ["Outpainting"]        
         values += [video_resolution, video_length_summary, video_seed, video_guidance_scale, video_flow_shift, video_num_inference_steps]
         labels += [ "Resolution", "Video Length", "Seed", video_guidance_label, "Flow Shift", "Num Inference steps"]
 
@@ -4054,7 +4062,7 @@ def generate_video(
                             preprocess_type = process_map.get(process_letter, "vace")
                         else:
                             preprocess_type2 = process_map.get(process_letter, None)
-                    process_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "identity": "Identity Mask", "vace" : "Vace Data"}
+                    process_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "U": "Identity Mask", "vace" : "Vace Data"}
                     status_info = "Extracting " + process_names[preprocess_type]
                     extra_process_list = ([] if preprocess_type2==None else [preprocess_type2]) + ([] if process_outside_mask==None or process_outside_mask == preprocess_type else [process_outside_mask])
                     if len(extra_process_list) == 1:
