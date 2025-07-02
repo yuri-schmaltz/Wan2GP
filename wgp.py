@@ -18,6 +18,7 @@ from wan.utils import notification_sound
 from wan.configs import MAX_AREA_CONFIGS, WAN_CONFIGS, SUPPORTED_SIZES, VACE_SIZE_CONFIGS
 from wan.utils.utils import cache_video, convert_tensor_to_image, save_image
 from wan.modules.attention import get_attention_modes, get_supported_attention_modes
+from huggingface_hub import hf_hub_download, snapshot_download    
 import torch
 import gc
 import traceback
@@ -2138,7 +2139,6 @@ def get_hunyuan_text_encoder_filename(text_encoder_quantization):
 
 
 def process_files_def(repoId, sourceFolderList, fileList):
-    from huggingface_hub import hf_hub_download, snapshot_download    
     targetRoot = "ckpts/" 
     for sourceFolder, files in zip(sourceFolderList,fileList ):
         if len(files)==0:
