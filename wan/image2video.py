@@ -26,6 +26,7 @@ from .utils.fm_solvers import (FlowDPMSolverMultistepScheduler,
 from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 from wan.modules.posemb_layers import get_rotary_pos_embed
 from wan.utils.utils import resize_lanczos, calculate_new_dimensions
+from wan.utils.basic_flowmatch import FlowMatchScheduler
 
 def optimized_scale(positive_flat, negative_flat):
 

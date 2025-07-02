@@ -47,8 +47,8 @@ global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
-target_mmgp_version = "3.5.0"
-WanGP_version = "6.5"
+target_mmgp_version = "3.5.1"
+WanGP_version = "6.51"
 settings_version = 2.1
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
@@ -4071,7 +4071,7 @@ def generate_video(
                             preprocess_type = process_map.get(process_letter, "vace")
                         else:
                             preprocess_type2 = process_map.get(process_letter, None)
-                    process_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "U": "Identity Mask", "vace" : "Vace Data"}
+                    process_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "identity": "Identity Mask", "vace" : "Vace Data"}
                     status_info = "Extracting " + process_names[preprocess_type]
                     extra_process_list = ([] if preprocess_type2==None else [preprocess_type2]) + ([] if process_outside_mask==None or process_outside_mask == preprocess_type else [process_outside_mask])
                     if len(extra_process_list) == 1:
@@ -4316,10 +4316,11 @@ def generate_video(
 
                 time_flag = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d-%Hh%Mm%Ss")
                 save_prompt = original_prompts[0]
+                from wan.utils.utils import truncate_for_filesystem
                 if os.name == 'nt':
-                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(save_prompt[:50]).strip()}.mp4"
+                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(truncate_for_filesystem(save_prompt,50)).strip()}.mp4"
                 else:
-                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(save_prompt[:100]).strip()}.mp4"
+                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(truncate_for_filesystem(save_prompt,100)).strip()}.mp4"
                 video_path = os.path.join(save_path, file_name)
                 any_mmaudio = MMAudio_setting != 0 and server_config.get("mmaudio_enabled", 0) != 0 and sample.shape[1] >=fps
                 if audio_guide != None or any_mmaudio :
