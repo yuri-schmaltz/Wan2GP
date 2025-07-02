@@ -3757,6 +3757,8 @@ def generate_video(
                     loras_list_mult_choices_nums.append(mult)
         if len(loras_list_mult_choices_nums ) < len(activated_loras):
             loras_list_mult_choices_nums  += [1.0] * ( len(activated_loras) - len(loras_list_mult_choices_nums ) ) 
+        if len(loras_slists ) < len(activated_loras):
+            loras_slists  += [1.0] * ( len(activated_loras) - len(loras_slists ) ) 
         lora_dir = get_lora_dir(model_type)     
         loras_selected = [ os.path.join(lora_dir, lora) for lora in activated_loras]
 
