@@ -41,6 +41,7 @@ from preprocessing.matanyone  import app as matanyone_app
 from tqdm import tqdm
 import requests
 
+
 global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
@@ -2136,6 +2137,31 @@ def get_hunyuan_text_encoder_filename(text_encoder_quantization):
     return text_encoder_filename
 
 
+def process_files_def(repoId, sourceFolderList, fileList):
+    from huggingface_hub import hf_hub_download, snapshot_download    
+    targetRoot = "ckpts/" 
+    for sourceFolder, files in zip(sourceFolderList,fileList ):
+        if len(files)==0:
+            if not Path(targetRoot + sourceFolder).exists():
+                snapshot_download(repo_id=repoId,  allow_patterns=sourceFolder +"/*", local_dir= targetRoot)
+        else:
+            for onefile in files:     
+                if len(sourceFolder) > 0: 
+                    if not os.path.isfile(targetRoot + sourceFolder + "/" + onefile ):          
+                        hf_hub_download(repo_id=repoId,  filename=onefile, local_dir = targetRoot, subfolder=sourceFolder)
+                else:
+                    if not os.path.isfile(targetRoot + onefile ):          
+                        hf_hub_download(repo_id=repoId,  filename=onefile, local_dir = targetRoot)
+
+def download_mmaudio():
+    if server_config.get("mmaudio_enabled", 0) != 0:
+        enhancer_def = {
+            "repoId" : "DeepBeepMeep/Wan2.1",
+            "sourceFolderList" : [ "mmaudio", "DFN5B-CLIP-ViT-H-14-378"  ],
+            "fileList" : [ ["mmaudio_large_44k_v2.pth", "synchformer_state_dict.pth", "v1-44.pth"],["open_clip_config.json", "open_clip_pytorch_model.bin"]]
+        }
+        process_files_def(**enhancer_def)
+
 def download_models(model_filename, model_type):
     def computeList(filename):
         if filename == None:
@@ -2144,22 +2170,8 @@ def download_models(model_filename, model_type):
         filename = filename[pos+1:]
         return [filename]        
 
-    def process_files_def(repoId, sourceFolderList, fileList):
-        targetRoot = "ckpts/" 
-        for sourceFolder, files in zip(sourceFolderList,fileList ):
-            if len(files)==0:
-                if not Path(targetRoot + sourceFolder).exists():
-                    snapshot_download(repo_id=repoId,  allow_patterns=sourceFolder +"/*", local_dir= targetRoot)
-            else:
-                for onefile in files:     
-                    if len(sourceFolder) > 0: 
-                        if not os.path.isfile(targetRoot + sourceFolder + "/" + onefile ):          
-                            hf_hub_download(repo_id=repoId,  filename=onefile, local_dir = targetRoot, subfolder=sourceFolder)
-                    else:
-                        if not os.path.isfile(targetRoot + onefile ):          
-                            hf_hub_download(repo_id=repoId,  filename=onefile, local_dir = targetRoot)
 
-    from huggingface_hub import hf_hub_download, snapshot_download    
+
     from urllib.request import urlretrieve
     from wan.utils.utils import create_progress_hook
 
@@ -2180,15 +2192,7 @@ def download_models(model_filename, model_type):
         }
         process_files_def(**enhancer_def)
 
-    if server_config.get("mmaudio_enabled", 0) != 0:
-        enhancer_def = {
-            "repoId" : "DeepBeepMeep/Wan2.1",
-            "sourceFolderList" : [ "mmaudio", "DFN5B-CLIP-ViT-H-14-378"  ],
-            "fileList" : [ ["mmaudio_large_44k_v2.pth", "synchformer_state_dict.pth", "v1-44.pth"],["open_clip_config.json", "open_clip_pytorch_model.bin"]]
-        }
-        process_files_def(**enhancer_def)
-
-
+    download_mmaudio()
 
     def download_file(url,filename):
         if url.startswith("https://huggingface.co/") and "/resolve/main/" in url:
@@ -2686,7 +2690,8 @@ def apply_changes(  state,
         model_choice = generate_dropdown_model_list(transformer_type)
 
     header = generate_header(state["model_type"], compile=compile, attention_mode= attention_mode)
-    return "<DIV ALIGN=CENTER>The new configuration has been succesfully applied</DIV>", header, model_choice, gr.Row(visible= server_config["enhancer_enabled"] == 1),  gr.Row(visible= server_config["mmaudio_enabled"] > 0)
+    mmaudio_enabled = server_config["mmaudio_enabled"] > 0
+    return "<DIV ALIGN=CENTER>The new configuration has been succesfully applied</DIV>", header, model_choice, gr.Row(visible= server_config["enhancer_enabled"] == 1),  gr.Row(visible= mmaudio_enabled), gr.Column(visible= mmaudio_enabled)
 
 
 
@@ -3522,6 +3527,8 @@ def edit_video(
         configs["spatial_upsampling"] = spatial_upsampling
 
     any_mmaudio = MMAudio_setting != 0 and server_config.get("mmaudio_enabled", 0) != 0 and frames_count >=output_fps
+    if any_mmaudio: download_mmaudio()
+
     tmp_path = None
     any_change = False
     if sample != None:
@@ -6552,11 +6559,12 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         with gr.Group(elem_classes= "postprocess"):
                             with gr.Column():
                                 PP_temporal_upsampling, PP_spatial_upsampling = gen_upsampling_dropdowns("",  "", element_class ="postprocess")
+                            with gr.Column() as PP_MMAudio_col:
                                 PP_MMAudio_setting, PP_MMAudio_prompt, PP_MMAudio_neg_prompt, _ =  gen_mmaudio_dropdowns(  0, "" , "", None, element_class ="postprocess" )
                                 PP_MMAudio_seed = gr.Slider(-1, 999999999, value=-1, step=1, label="Seed (-1 for random)") 
                                 PP_repeat_generation = gr.Slider(1, 25.0, value=1, step=1, label="Number of Sample Videos to Generate") 
 
-                        video_info_postprocessing_btn = gr.Button("Apply Upscaling & MMAudio", size ="sm", visible=True)
+                        video_info_postprocessing_btn = gr.Button("Apply Postprocessing", size ="sm", visible=True)
                     with gr.Tab("Add Videos", id= "video_add"):
                         files_to_load = gr.Files(label= "Files to Load in Gallery", height=120)
                         with gr.Row():
@@ -6919,7 +6927,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             )
 
     return ( state, loras_choices, lset_name, state,
-             video_guide, video_mask, image_refs, prompt_enhancer_row, mmaudio_tab  
+             video_guide, video_mask, image_refs, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col  
             ) 
  
 
@@ -6937,7 +6945,7 @@ def generate_download_tab(lset_name,loras_choices, state):
     download_loras_btn.click(fn=download_loras, inputs=[], outputs=[download_status_row, download_status]).then(fn=refresh_lora_list, inputs=[state, lset_name,loras_choices], outputs=[lset_name, loras_choices])
 
     
-def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhancer_row, mmaudio_tab):
+def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col):
     gr.Markdown("Please click Apply Changes at the bottom so that the changes are effective. Some choices below may be locked if the app has been launched by specifying a config preset.")
     with gr.Column():
         with gr.Tabs():
@@ -7199,7 +7207,7 @@ def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhan
                     notification_sound_enabled_choice,
                     notification_sound_volume_choice
                 ],
-                outputs= [msg , header, model_choice, prompt_enhancer_row, mmaudio_tab]
+                outputs= [msg , header, model_choice, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col]
         )
 
 def generate_about_tab():
@@ -7725,7 +7733,7 @@ def create_ui():
                     header = gr.Markdown(generate_header(transformer_type, compile, attention_mode), visible= True)
                 with gr.Row():
                     (   state, loras_choices, lset_name, state,
-                        video_guide, video_mask, image_refs, prompt_enhancer_row, mmaudio_tab
+                        video_guide, video_mask, image_refs, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col
                     ) = generate_video_tab(model_choice=model_choice, header=header, main = main)
             with gr.Tab("Guides", id="info") as info_tab:
                 generate_info_tab()
@@ -7735,7 +7743,7 @@ def create_ui():
                 with gr.Tab("Downloads", id="downloads") as downloads_tab:
                     generate_download_tab(lset_name, loras_choices, state)
                 with gr.Tab("Configuration", id="configuration") as configuration_tab:
-                    generate_configuration_tab(state, main, header, model_choice, prompt_enhancer_row, mmaudio_tab)
+                    generate_configuration_tab(state, main, header, model_choice, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col)
             with gr.Tab("About"):
                 generate_about_tab()
 
@@ -7766,3 +7774,4 @@ if __name__ == "__main__":
             url = "http://" + server_name 
         webbrowser.open(url + ":" + str(server_port), new = 0, autoraise = True)
     demo.launch(server_name=server_name, server_port=server_port, share=args.share, allowed_paths=[save_path])
+# Lucky me !!!
