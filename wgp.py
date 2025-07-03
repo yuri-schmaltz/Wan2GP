@@ -3553,11 +3553,11 @@ def edit_video(
         if repeat_no >= total_generation: break
         repeat_no +=1
         gen["repeat_no"] = repeat_no
-		
+        suffix =  "" if "_post" in video_source else "_post"
         if any_mmaudio:
             send_cmd("progress", [0, get_latest_status(state,"MMAudio Soundtrack Generation")])
             from postprocessing.mmaudio.mmaudio import video_to_audio
-            new_video_path = get_available_filename(save_path, video_source, "_post")
+            new_video_path = get_available_filename(save_path, video_source, suffix)
             video_to_audio(video_path, prompt = MMAudio_prompt, negative_prompt = MMAudio_neg_prompt, seed = seed, num_steps = 25, cfg_strength = 4.5, duration= frames_count /output_fps, video_save_path = new_video_path , persistent_models = server_config.get("mmaudio_enabled", 0) == 2, verboseLevel = verbose_level)
             configs["MMAudio_setting"] = MMAudio_setting
             configs["MMAudio_prompt"] = MMAudio_prompt
@@ -3566,7 +3566,7 @@ def edit_video(
             any_change = True
         elif tempAudioFileName != None:
             # combine audio file and new video file
-            new_video_path = get_available_filename(save_path, video_source, "_post")
+            new_video_path = get_available_filename(save_path, video_source, suffix)
             os.system('ffmpeg -v quiet -y -i "{}" -i "{}" -c copy "{}"'.format(video_path, tempAudioFileName, new_video_path))
         else:
             new_video_path = video_path
@@ -4205,6 +4205,7 @@ def generate_video(
                     model_filename = model_filename,
                     model_type = base_model_type,
                     loras_slists = loras_slists,
+                    offloadobj = offloadobj,
                 )
             except Exception as e:
                 if temp_filename!= None and  os.path.isfile(temp_filename):
@@ -7033,7 +7034,7 @@ def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhan
                 )
 
                 save_path_choice = gr.Textbox(
-                    label="Output Folder for Generated Videos",
+                    label="Output Folder for Generated Videos (need to restart app to be taken into account)",
                     value=server_config.get("save_path", save_path)
                 )
 
