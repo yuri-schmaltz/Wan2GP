@@ -2372,7 +2372,7 @@ def download_models(model_filename, model_type):
 
     model_family = get_model_family(model_type)
     finetune_def = get_model_finetune_def(model_type)
-    if finetune_def != None:
+    if finetune_def != None and not model_type in modules_files:
         if not os.path.isfile(model_filename ):
             use_url = model_filename 
             for url in finetune_def["URLs"]:

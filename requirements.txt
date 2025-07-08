@@ -44,5 +44,6 @@ pyloudnorm
 misaki
 soundfile
 ffmpeg
+pyannote.audio
 # num2words
 # spacy

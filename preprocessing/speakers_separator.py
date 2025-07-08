@@ -93,7 +93,7 @@ class OptimizedPyannote31SpeakerSeparator:
             xprint(f"Error loading pipeline: {e}")
             xprint(f"Error type: {type(e)}")
             import traceback
-            traceback.xprint_exc()
+            traceback.print_exc()
             raise
 
 
