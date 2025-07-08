@@ -43,5 +43,6 @@ open_clip_torch >= 2.29.0
 pyloudnorm
 misaki
 soundfile
+ffmpeg
 # num2words
 # spacy
