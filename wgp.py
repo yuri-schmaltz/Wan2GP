@@ -3090,6 +3090,8 @@ def select_video(state, input_file_list, event_data: gr.EventData):
             video_MMAudio_setting = configs.get("MMAudio_setting", 0)
             video_MMAudio_prompt = configs.get("MMAudio_prompt", "")
             video_MMAudio_neg_prompt = configs.get("MMAudio_neg_prompt", "")
+            video_seed = configs.get("seed", -1)
+            video_MMAudio_seed = configs.get("MMAudio_seed", video_seed)        
             if len(video_spatial_upsampling) > 0:
                 video_temporal_upsampling += " " + video_spatial_upsampling
             if len(video_temporal_upsampling) > 0:
@@ -3136,8 +3138,6 @@ def select_video(state, input_file_list, event_data: gr.EventData):
             video_length_summary += " ("
             if video_length != frames_count: video_length_summary += f"real: {frames_count} frames, "
             video_length_summary += f"{frames_count/fps:.1f}s, {round(fps)} fps)"
-            video_seed = configs.get("seed", -1)
-            video_MMAudio_seed = configs.get("MMAudio_seed", video_seed)        
             video_guidance_scale = configs.get("video_guidance_scale", 1)
             video_embedded_guidance_scale = configs.get("video_embedded_guidance_scale ", 1)
             if get_model_family(video_model_type) == "hunyuan":

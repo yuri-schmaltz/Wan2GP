@@ -43,7 +43,7 @@ open_clip_torch >= 2.29.0
 pyloudnorm
 misaki
 soundfile
-ffmpeg
+ffmpeg-python
 pyannote.audio
 # num2words
 # spacy
