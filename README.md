@@ -21,11 +21,11 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 
 ## 🔥 Latest Updates
 ### July 8 2025: WanGP v6.6, WanGP offers you **Vace Multitalk Dual Voices Fusionix Infinite** :
-**Vace** our beloved super Control Net has been combined with **Multitalk** the new king in town that can animate two people speaking (**Dual Voices**). It is accelerated by the **Fusionix** model and thanks to *Sliding Windows* support and *Adaptive Projected Guidance* (much slower but should reduce the reddish effect with long videos) your two people will be able to talk for very a long time (which is an **Infinite** amount of time in the field of video generation).
+**Vace** our beloved super Control Net has been combined with **Multitalk** the new king in town that can animate up to two people speaking (**Dual Voices**). It is accelerated by the **Fusionix** model and thanks to *Sliding Windows* support and *Adaptive Projected Guidance* (much slower but should reduce the reddish effect with long videos) your two people will be able to talk for very a long time (which is an **Infinite** amount of time in the field of video generation).
 
 Of course you will get as well *Multitalk* vanilla and also *Multitalk 720p* as a bonus.
 
-And since I am mister nice guy I had enclosed as an exclusivity an *Audio Separator* that will save you time to isolate each voice when using Multitalk with two people.
+And since I am mister nice guy I have enclosed as an exclusivity an *Audio Separator* that will save you time to isolate each voice when using Multitalk with two people.
 
 As I feel like a resting a bit I haven't produced a nice sample Video to illustrate all these new capabilities. But here is the thing, I ams sure you will publish in the *Share Your Best Video* channel your *Master Pieces*. The best one will be added to the *Announcements Channel* and will bring eternal fame to its author.
 

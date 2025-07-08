@@ -5,19 +5,19 @@ from einops import rearrange, repeat
 from .multitalk_utils import RotaryPositionalEmbedding1D, normalize_and_scale, split_token_counts_and_frame_ids
 from wan.modules.attention import pay_attention
 
-import xformers.ops
+# import xformers.ops
 
-try:
-    import flash_attn_interface
-    FLASH_ATTN_3_AVAILABLE = True
-except ModuleNotFoundError:
-    FLASH_ATTN_3_AVAILABLE = False
+# try:
+#     import flash_attn_interface
+#     FLASH_ATTN_3_AVAILABLE = True
+# except ModuleNotFoundError:
+#     FLASH_ATTN_3_AVAILABLE = False
 
-try:
-    import flash_attn
-    FLASH_ATTN_2_AVAILABLE = True
-except ModuleNotFoundError:
-    FLASH_ATTN_2_AVAILABLE = False
+# try:
+#     import flash_attn
+#     FLASH_ATTN_2_AVAILABLE = True
+# except ModuleNotFoundError:
+#     FLASH_ATTN_2_AVAILABLE = False
 
 import warnings
 
