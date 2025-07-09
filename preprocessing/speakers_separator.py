@@ -148,7 +148,8 @@ class OptimizedPyannote31SpeakerSeparator:
         both_speaking_mask = np.zeros(audio_length, dtype=bool)
 
         # ── 1) try the proper overlap model ────────────────────────────────
-        overlap_pipeline = self._get_overlap_pipeline()
+        # overlap_pipeline = self._get_overlap_pipeline() # doesnt work anyway
+        overlap_pipeline = None
 
         # try the path stored by separate_audio – otherwise whatever the
         # diarization object carries (may be None)

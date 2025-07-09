@@ -3295,7 +3295,7 @@ def get_preprocessor(process_type, inpaint_color):
 def process_images_multithread(image_processor, items, process_type, wrap_in_list = True, max_workers: int = os.cpu_count()/ 2) :
     if not items:
        return []    
-    
+    max_workers = 11
     import concurrent.futures
     start_time = time.time()
     # print(f"Preprocessus:{process_type} started")
@@ -3910,6 +3910,7 @@ def generate_video(
 
     prompts = prompt.split("\n")
     prompts = [part for part in prompts if len(prompt)>0]
+    parsed_keep_frames_video_source= max_source_video_frames if len(keep_frames_video_source) ==0 else int(keep_frames_video_source) 
 
 
     loras = state["loras"]
@@ -4026,13 +4027,13 @@ def generate_video(
             frames_to_inject = [None] * (max(frames_positions_list) + 1)
             for i, pos in enumerate(frames_positions_list):
                 frames_to_inject[pos] = image_refs[i] 
-            if video_guide == None and video_source == None and not "L" in image_prompt_type:
-                from wan.utils.utils import resize_lanczos, calculate_new_dimensions, get_outpainting_full_area_dimensions
-                w, h = image_refs[0].size
-                if outpainting_dims != None:
-                    h, w = get_outpainting_full_area_dimensions(h,w, outpainting_dims)
-                default_image_size = calculate_new_dimensions(height, width, h, w, fit_canvas)
-                fit_canvas = None
+        if video_guide == None and video_source == None and not "L" in image_prompt_type and (nb_frames_positions > 0 or "K" in video_prompt_type) :
+            from wan.utils.utils import resize_lanczos, calculate_new_dimensions, get_outpainting_full_area_dimensions
+            w, h = image_refs[0].size
+            if outpainting_dims != None:
+                h, w = get_outpainting_full_area_dimensions(h,w, outpainting_dims)
+            default_image_size = calculate_new_dimensions(height, width, h, w, fit_canvas)
+            fit_canvas = None
         if len(image_refs) > nb_frames_positions:  
             if hunyuan_avatar: remove_background_images_ref = 0
             any_background_ref = "K" in video_prompt_type 
@@ -4267,8 +4268,7 @@ def generate_video(
                     from wan.utils.utils import get_video_frame
                     refresh_preview["video_source"] = get_video_frame(video_source, 0)
                 if video_source != None and len(video_source) > 0 and window_no == 1:
-                    keep_frames_video_source= max_source_video_frames if len(keep_frames_video_source) ==0 else int(keep_frames_video_source) 
-                    prefix_video  = preprocess_video(width=width, height=height,video_in=video_source, max_frames= keep_frames_video_source , start_frame = 0, fit_canvas= sample_fit_canvas, target_fps = fps, block_size = 32 if ltxv else 16)
+                    prefix_video  = preprocess_video(width=width, height=height,video_in=video_source, max_frames= parsed_keep_frames_video_source , start_frame = 0, fit_canvas= sample_fit_canvas, target_fps = fps, block_size = 32 if ltxv else 16)
                     prefix_video  = prefix_video.permute(3, 0, 1, 2)
                     prefix_video  = prefix_video.float().div_(127.5).sub_(1.) # c, f, h, w
                     pre_video_guide =  prefix_video[:, -reuse_frames:]
@@ -4629,7 +4629,7 @@ def generate_video(
 
                 send_cmd("output")
 
-        seed = set_seed(seed)
+        seed = set_seed(-1)
     clear_status(state)
     offload.unload_loras_from_model(trans)
     if len(control_audio_tracks) > 0:
