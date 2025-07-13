@@ -262,7 +262,7 @@ def process_prompt_and_add_tasks(state, model_choice):
     MMAudio_setting = inputs["MMAudio_setting"]
 
     if skip_steps_cache_type == "mag":
-        if model_type in  ["sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B"]:
+        if model_type in  ["sky_df_1.3B", "sky_df_14B"]:
             gr.Info("Mag Cache is not supported with Diffusion Forcing")
             return
         if num_inference_steps > 50:
@@ -1294,6 +1294,12 @@ def _parse_args():
         help="Path to a directory that contains LTX Videos Loras"
     )
 
+    parser.add_argument(
+        "--lora-dir-flux",
+        type=str,
+        default="loras_flux", 
+        help="Path to a directory that contains flux images Loras"
+    )
 
 
     parser.add_argument(
@@ -1534,6 +1540,8 @@ def get_lora_dir(model_type):
         return root_lora_dir    
     elif model_family == "ltxv":
             return args.lora_dir_ltxv
+    elif model_family == "flux":
+            return args.lora_dir_flux
     elif model_family =="hunyuan":
         if i2v:
             return args.lora_dir_hunyuan_i2v
@@ -1622,26 +1630,13 @@ for path in  ["wan2.1_Vace_1.3B_preview_bf16.safetensors", "sky_reels2_diffusion
 "sky_reels2_diffusion_forcing_720p_14B_quanto_int8.safetensors", "sky_reels2_diffusion_forcing_720p_14B_quanto_fp16_int8.safetensors", "wan2.1_image2video_480p_14B_bf16.safetensors", "wan2.1_image2video_480p_14B_quanto_int8.safetensors",
 "wan2.1_image2video_720p_14B_quanto_int8.safetensors", "wan2.1_image2video_720p_14B_quanto_fp16_int8.safetensors", "wan2.1_image2video_720p_14B_bf16.safetensors",
 "wan2.1_text2video_14B_bf16.safetensors", "wan2.1_text2video_14B_quanto_int8.safetensors",
-"wan2.1_Vace_14B_mbf16.safetensors", "wan2.1_Vace_14B_quanto_mbf16_int8.safetensors"
+"wan2.1_Vace_14B_mbf16.safetensors", "wan2.1_Vace_14B_quanto_mbf16_int8.safetensors", "wan2.1_FLF2V_720p_14B_quanto_int8.safetensors", "wan2.1_FLF2V_720p_14B_bf16.safetensors"
 ]:
     if Path(os.path.join("ckpts" , path)).is_file():
         print(f"Removing old version of model '{path}'. A new version of this model will be downloaded next time you use it.")
         os.remove( os.path.join("ckpts" , path))
 
-finetunes = {}
-
-wan_choices_t2v=["ckpts/wan2.1_text2video_1.3B_bf16.safetensors", "ckpts/wan2.1_text2video_14B_mbf16.safetensors", "ckpts/wan2.1_text2video_14B_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_text2video_14B_quanto_mfp16_int8.safetensors",  
-                         "ckpts/wan2.1_recammaster_1.3B_bf16.safetensors", "ckpts/sky_reels2_diffusion_forcing_1.3B_mbf16.safetensors", "ckpts/sky_reels2_diffusion_forcing_14B_bf16.safetensors",
-                        "ckpts/sky_reels2_diffusion_forcing_14B_quanto_int8.safetensors", "ckpts/sky_reels2_diffusion_forcing_14B_quanto_fp16_int8.safetensors",  "ckpts/sky_reels2_diffusion_forcing_720p_14B_mbf16.safetensors",
-                        "ckpts/sky_reels2_diffusion_forcing_720p_14B_quanto_mbf16_int8.safetensors", "ckpts/sky_reels2_diffusion_forcing_720p_14B_quanto_mfp16_int8.safetensors",  
-                        "ckpts/wan2.1_Vace_1.3B_mbf16.safetensors", 
-                        "ckpts/wan2_1_phantom_1.3B_mbf16.safetensors", "ckpts/wan2.1_phantom_14B_mbf16.safetensors", "ckpts/wan2.1_phantom_14B_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_phantom_14B_quanto_mfp16_int8.safetensors", 
-                        ]    
-wan_choices_i2v=["ckpts/wan2.1_image2video_480p_14B_mbf16.safetensors", "ckpts/wan2.1_image2video_480p_14B_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_image2video_480p_14B_quanto_mfp16_int8.safetensors",  "ckpts/wan2.1_image2video_720p_14B_mbf16.safetensors",
-                        "ckpts/wan2.1_image2video_720p_14B_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_image2video_720p_14B_quanto_mfp16_int8.safetensors", "ckpts/wan2.1_Fun_InP_1.3B_bf16.safetensors", "ckpts/wan2.1_Fun_InP_14B_bf16.safetensors",
-                        "ckpts/wan2.1_Fun_InP_14B_quanto_int8.safetensors", "ckpts/wan2.1_Fun_InP_14B_quanto_fp16_int8.safetensors", 
-                        ]
-ltxv_choices= ["ckpts/ltxv_0.9.7_13B_dev_bf16.safetensors", "ckpts/ltxv_0.9.7_13B_dev_quanto_bf16_int8.safetensors", "ckpts/ltxv_0.9.7_13B_distilled_lora128_bf16.safetensors"]
+models_def = {}
 
 modules_files = {
     "vace_14B" : ["ckpts/wan2.1_Vace_14B_module_mbf16.safetensors", "ckpts/wan2.1_Vace_14B_module_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_Vace_14B_module_quanto_mfp16_int8.safetensors"],
@@ -1649,31 +1644,15 @@ modules_files = {
     "multitalk": ["ckpts/wan2.1_multitalk_14B_mbf16.safetensors", "ckpts/wan2.1_multitalk_14B_quanto_mbf16_int8.safetensors", "ckpts/wan2.1_multitalk_14B_quanto_mfp16_int8.safetensors"]
 }
 
+# unused
+base_types = ["multitalk", "fantasy", "vace_14B", "vace_multitalk_14B",
+                "t2v_1.3B", "t2v", "vace_1.3B", "phantom_1.3B", "phantom_14B", 
+                "recam_1.3B",  "sky_df_1.3B", "sky_df_14B",
+                "i2v", "flf2v_720p", "fun_inp_1.3B", "fun_inp", "ltxv_13B",
+                "hunyuan", "hunyuan_i2v", "hunyuan_custom", "hunyuan_custom_audio", "hunyuan_custom_edit", "hunyuan_avatar", 
+                ] 
 
-hunyuan_choices= ["ckpts/hunyuan_video_720_bf16.safetensors", "ckpts/hunyuan_video_720_quanto_int8.safetensors", "ckpts/hunyuan_video_i2v_720_bf16v2.safetensors", "ckpts/hunyuan_video_i2v_720_quanto_int8v2.safetensors",
-                 "ckpts/hunyuan_video_custom_720_bf16.safetensors", "ckpts/hunyuan_video_custom_720_quanto_bf16_int8.safetensors",
-                 "ckpts/hunyuan_video_custom_audio_720_bf16.safetensors", "ckpts/hunyuan_video_custom_audio_720_quanto_bf16_int8.safetensors",
-                 "ckpts/hunyuan_video_custom_edit_720_bf16.safetensors", "ckpts/hunyuan_video_custom_edit_720_quanto_bf16_int8.safetensors",
-                 "ckpts/hunyuan_video_avatar_720_bf16.safetensors", "ckpts/hunyuan_video_avatar_720_quanto_bf16_int8.safetensors",
-                 ]
-
-transformer_choices = wan_choices_t2v + wan_choices_i2v + ltxv_choices + hunyuan_choices
-def get_dependent_models(model_type, quantization, dtype_policy ):
-    # if model_type == "fantasy":
-    #     dependent_model_type = "i2v_720p"
-    if model_type == "ltxv_13B_distilled": 
-        dependent_model_type = "ltxv_13B"
-    # elif model_type == "vace_14B": 
-    #     dependent_model_type = "t2v"
-    else:
-        return [], []
-    return [get_model_filename(dependent_model_type, quantization, dtype_policy)], [dependent_model_type]
-
-abstract_model_types = ["multitalk", "fantasy", "vace_14B", "vace_multitalk_14B", "flf2v_720p"] 
-model_types = [ "t2v_1.3B", "t2v", "i2v", "i2v_720p",  "vace_1.3B", "phantom_1.3B", "phantom_14B",
-               "fun_inp_1.3B", "fun_inp", "recam_1.3B",  "sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled", 
-               "hunyuan", "hunyuan_i2v", "hunyuan_custom", "hunyuan_custom_audio", "hunyuan_custom_edit", "hunyuan_avatar"] 
-
+# only needed for imported old settings files
 model_signatures = {"t2v": "text2video_14B", "t2v_1.3B" : "text2video_1.3B",   "fun_inp_1.3B" : "Fun_InP_1.3B",  "fun_inp" :  "Fun_InP_14B", 
                     "i2v" : "image2video_480p", "i2v_720p" : "image2video_720p" , "vace_1.3B" : "Vace_1.3B", "vace_14B": "Vace_14B", "recam_1.3B": "recammaster_1.3B", 
                     "sky_df_1.3B" : "sky_reels2_diffusion_forcing_1.3B", "sky_df_14B" : "sky_reels2_diffusion_forcing_14B", 
@@ -1683,12 +1662,12 @@ model_signatures = {"t2v": "text2video_14B", "t2v_1.3B" : "text2video_1.3B",   "
                     "hunyuan_avatar" : "hunyuan_video_avatar"  }
 
 def get_base_model_type(model_type):
-    finetune_def = get_model_finetune_def(model_type)
-    if finetune_def == None:
+    model_def = get_model_def(model_type)
+    if model_def == None:
         return model_type if model_type in model_types else None 
         # return model_type
     else:
-        return finetune_def["architecture"]
+        return model_def["architecture"]
 
 def are_model_types_compatible(imported_model_type, current_model_type):
     imported_base_model_type = get_base_model_type(imported_model_type)
@@ -1697,29 +1676,26 @@ def are_model_types_compatible(imported_model_type, current_model_type):
         return True
 
     eqv_map = {
-        "i2v_720p" : "i2v",
         "flf2v_720p" : "i2v",
         "t2v_1.3B" : "t2v",
         "sky_df_1.3B" : "sky_df_14B",
-        "sky_df_720p_14B" : "sky_df_14B",
     }
     if imported_base_model_type in eqv_map:
         imported_base_model_type = eqv_map[imported_base_model_type]
     comp_map = { 
                  "vace_14B" : [ "vace_multitalk_14B"],
                  "t2v" : [ "vace_14B", "vace_1.3B" "vace_multitalk_14B", "t2v_1.3B", "phantom_1.3B","phantom_14B"],
-                 "i2v" : [ "fantasy", "multitalk", "i2v_720p","flf2v_720p" ],
-                 "ltxv_13B_distilled": ["ltxv_13B"],
+                 "i2v" : [ "fantasy", "multitalk", "flf2v_720p" ],
                  "fantasy": ["multitalk"],
-                 "sky_df_14B": ["sky_df_1.3B", "sky_df_720p_14B"],
+                 "sky_df_14B": ["sky_df_1.3B"],
                  "hunyuan_custom":  ["hunyuan_custom_edit", "hunyuan_custom_audio"],
                 }
     comp_list=  comp_map.get(imported_base_model_type, None)
     if comp_list == None: return False
     return curent_base_model_type in comp_list 
 
-def get_model_finetune_def(model_type):
-    return finetunes.get(model_type, None )
+def get_model_def(model_type):
+    return models_def.get(model_type, None )
 
 
 
@@ -1743,7 +1719,7 @@ def get_model_family(model_type):
 
 def test_class_i2v(model_type):
     model_type = get_base_model_type(model_type)
-    return model_type in ["i2v", "i2v_720p", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy", "hunyuan_i2v", "multitalk" ] 
+    return model_type in ["i2v", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy", "hunyuan_i2v", "multitalk" ] 
 
 def test_vace_module(model_type):
     model_type = get_base_model_type(model_type)
@@ -1751,13 +1727,13 @@ def test_vace_module(model_type):
 
 def test_any_sliding_window(model_type):
     model_type = get_base_model_type(model_type)
-    return test_vace_module(model_type) or model_type in ["sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled", "multitalk", "t2v", "fantasy"] or test_class_i2v(model_type)
+    return test_vace_module(model_type) or model_type in ["sky_df_1.3B", "sky_df_14B", "ltxv_13B", "multitalk", "t2v", "fantasy"] or test_class_i2v(model_type)
 
 def get_model_min_frames_and_step(model_type):
     model_type = get_base_model_type(model_type)
-    if model_type in ["sky_df_14B", "sky_df_720p_14B"]:
+    if model_type in ["sky_df_14B"]:
         return 17, 20
-    elif model_type in ["ltxv_13B", "ltxv_13B_distilled"]:
+    elif model_type in ["ltxv_13B"]:
         return 17, 8
     elif test_vace_module(model_type): 
         return 17, 4
@@ -1768,11 +1744,11 @@ def get_model_fps(model_type):
     model_type = get_base_model_type(model_type)
     if model_type in ["hunyuan_avatar", "hunyuan_custom_audio", "multitalk", "vace_multitalk_14B"]:
         fps = 25
-    elif model_type in ["sky_df_14B", "sky_df_720p_14B", "hunyuan", "hunyuan_i2v", "hunyuan_custom_edit", "hunyuan_custom"]:
+    elif model_type in ["sky_df_14B", "hunyuan", "hunyuan_i2v", "hunyuan_custom_edit", "hunyuan_custom"]:
         fps = 24
     elif model_type in ["fantasy"]:
         fps = 23
-    elif model_type in ["ltxv_13B", "ltxv_13B_distilled"]:
+    elif model_type in ["ltxv_13B"]:
         fps = 30
     else:
         fps = 16
@@ -1790,96 +1766,30 @@ def get_computed_fps(force_fps, base_model_type , video_guide, video_source ):
     return fps
 
 def get_model_name(model_type, description_container = [""]):
-    finetune_def = get_model_finetune_def(model_type)
-    if finetune_def != None:
-        model_name = finetune_def["name"]
-        description = finetune_def["description"]
-        description_container[0] = description
-        return model_name
-    model_filename = get_model_filename(model_type)
-    if "Fun" in model_filename:
-        model_name = "Fun InP image2video"
-        model_name += " 14B" if "14B" in model_filename else " 1.3B"
-        description = "The Fun model is an alternative image 2 video that supports out the box End Image fixing (contrary to the original Wan image 2 video model). The 1.3B adds also image 2 to video capability  to the 1.3B model."
-    elif "Vace" in model_filename:
-        model_name = "Vace ControlNet"
-        model_name += " 14B" if "14B" in model_filename else " 1.3B"
-        description = "The Vace ControlNet model is a powerful model that allows you to control the content of the generated video based of additional custom data : pose or depth video, images or objects you want to see in the video."
-    elif "image" in model_filename:
-        model_name = "Wan2.1 image2video"
-        model_name += " 720p" if "720p" in model_filename else " 480p"
-        model_name += " 14B"
-        if "720p" in model_filename:
-            description = "The standard Wan Image 2 Video specialized to generate 720p images. It also offers Start and End Image support (End Image is not supported in the original model but seems to work well)"
-        else:
-            description = "The standard Wan Image 2 Video specialized to generate 480p images. It also offers Start and End Image support (End Image is not supported in the original model but seems to work well)"
-    elif "recam" in model_filename:
-        model_name = "ReCamMaster"
-        model_name += " 14B" if "14B" in model_filename else " 1.3B"
-        description = "The Recam Master in theory should allow you to replay a video by applying a different camera movement. The model supports only video that are at least 81 frames long (any frame beyond will be ignored)"
-    elif "sky_reels2_diffusion_forcing" in model_filename:
-        model_name = "SkyReels2 Diffusion Forcing"
-        if "720p" in model_filename :
-            model_name += " 720p"
-        elif not "1.3B" in model_filename :
-            model_name += " 540p"
-        model_name += " 14B" if "14B" in model_filename else " 1.3B"
-        description = "The SkyReels 2 Diffusion Forcing model has been designed to generate very long videos that exceeds the usual 5s limit. You can also use this model to extend any existing video."
-    elif "phantom" in model_filename:
-        model_name = "Phantom"
-        if "14B" in model_filename:
-            model_name += " 14B"
-            description = "The Phantom model is specialized to transfer people or objects of your choice into a generated Video. It seems to produce better results if you keep the original background of the Image Referendes."
-        else:
-            model_name += " 1.3B"
-            description = "The Phantom model is specialized to transfer people or objects of your choice into a generated Video. It produces very nice results when used at 720p."
-    elif "ltxv_0.9.7_13B_dev" in model_filename:
-        model_name = "LTX Video 0.9.7 13B"
-        description = "LTX Video is a fast model that can be used to generate long videos (up to 260 frames).It is recommended to keep the number of steps to 30 or you will need to update the file 'ltxv_video/configs/ltxv-13b-0.9.7-dev.yaml'.The LTX Video model expects very long prompts, so don't hesitate to use the Prompt Enhancer."
-    elif "ltxv_0.9.7_13B_distilled" in model_filename:
-        model_name = "LTX Video 0.9.7 Distilled 13B"
-        description = "LTX Video is a fast model that can be used to generate long videos (up to 260 frames).This distilled version  is a very fast version and retains a high level of quality. The LTX Video model expects very long prompts, so don't hesitate to use the Prompt Enhancer."
-    elif "hunyuan_video_720" in model_filename:
-        model_name = "Hunyuan Video text2video 720p 13B"
-        description = "Probably the best text 2 video model available."
-    elif "hunyuan_video_i2v" in model_filename:
-        model_name = "Hunyuan Video image2video 720p 13B"
-        description = "A good looking image 2 video model, but not so good in prompt adherence."
-    elif "hunyuan_video_custom" in model_filename:
-        if "audio" in model_filename:
-            model_name = "Hunyuan Video Custom Audio 720p 13B"
-            description = "The Hunyuan Video Custom Audio model can be used to generate scenes of a person speaking given a Reference Image and a Recorded Voice or Song. The reference image is not a start image and therefore one can represent the person in a different context.The video length can be anything up to 10s. It is also quite good to generate no sound Video based on a person."
-        elif "edit" in model_filename:
-            model_name = "Hunyuan Video Custom Edit 720p 13B"
-            description = "The Hunyuan Video Custom Edit model can be used to do Video inpainting on a person (add accessories or completely replace the person). You will need in any case to define a Video Mask which will indicate which area of the Video should be edited."
-        else:
-            model_name = "Hunyuan Video Custom 720p 13B"
-            description = "The Hunyuan Video Custom model is probably the best model to transfer people (only people for the momment) as it is quite good to keep their identity. However it is slow as to get good results, you need to generate 720p videos with 30 steps."
-    elif "hunyuan_video_avatar" in model_filename:
-        model_name = "Hunyuan Video Avatar 720p 13B"
-        description = "With the Hunyuan Video Avatar model you can animate a person based on the content of an audio input. Please note that the video generator works by processing 128 frames segment at a time (even if you ask less). The good news is that it will concatenate multiple segments for long video generation (max 3 segments recommended as the quality will get worse)."
-    else:
-        model_name = "Wan2.1 text2video"
-        model_name += " 14B" if "14B" in model_filename else " 1.3B"
-        description = "The original Wan Text 2 Video model. Most other models have been built on top of it" 
+    model_def = get_model_def(model_type)
+    if model_def == None: raise Exception(f"Unknown model {model_type}")
+    model_name = model_def["name"]
+    description = model_def["description"]
     description_container[0] = description
     return model_name
 
 def get_model_record(model_name):
     return f"WanGP v{WanGP_version} by DeepBeepMeep - " +  model_name
 
-def get_finetune_URLs(model_type, stack= []):
-    finetune_def = finetunes.get(model_type, None)
-    if finetune_def != None: 
-        URLs = finetune_def["URLs"]
-        if isinstance(URLs, str):
-            if len(stack) > 10: raise Exception(f"Circular Reference in Model URLs dependencies: {stack}")
-            return get_finetune_URLs(URLs, stack = stack + [URLs] )
+def get_model_recursive_prop(model_type, prop = "URLs", return_list = False,  stack= []):
+    model_def = models_def.get(model_type, None)
+    if model_def != None: 
+        prop_value = model_def.get(prop, None)
+        if prop_value == None:
+            return []
+        if isinstance(prop_value, str):
+            if len(stack) > 10: raise Exception(f"Circular Reference in Model {prop} dependencies: {stack}")
+            return get_model_recursive_prop(prop_value, prop = prop, stack = stack + [prop_value] )
         else:
-            return URLs
+            return prop_value
     else:
         if model_type in model_types:
-            return model_type
+            return [] if return_list else model_type 
         else:
             raise Exception(f"Unknown model type '{model_type}'")
         
@@ -1889,17 +1799,14 @@ def get_model_filename(model_type, quantization ="int8", dtype_policy = "", is_m
         choices = modules_files.get(model_type, None)
         if choices == None: raise Exception(f"Invalid Module Id '{model_type}'")
     else:
-        finetune_def = finetunes.get(model_type, None)
-        if finetune_def != None: 
-            URLs = finetune_def["URLs"]
-            if isinstance(URLs, str):
-                if len(stack) > 10: raise Exception(f"Circular Reference in Model URLs dependencies: {stack}")
-                return get_model_filename(URLs, quantization=quantization, dtype_policy=dtype_policy, stack = stack + [URLs])
-            else:
-                choices = [ ("ckpts/" + os.path.basename(path) if path.startswith("http") else path)  for path in URLs ]
+        model_def = models_def.get(model_type, None)
+        if model_def == None: raise Exception(f"Unknown model type {model_type}") 
+        URLs = model_def["URLs"]
+        if isinstance(URLs, str):
+            if len(stack) > 10: raise Exception(f"Circular Reference in Model URLs dependencies: {stack}")
+            return get_model_filename(URLs, quantization=quantization, dtype_policy=dtype_policy, stack = stack + [URLs])
         else:
-            signature = model_signatures[model_type]
-            choices = [ name for name in transformer_choices if signature in name]
+            choices = [ ("ckpts/" + os.path.basename(path) if path.startswith("http") else path)  for path in URLs ]
     if len(quantization) == 0:
         quantization = "bf16"
 
@@ -1954,8 +1861,8 @@ def fix_settings(model_type, ui_defaults):
     if image_prompt_type != None :
         if not isinstance(image_prompt_type, str):
             image_prompt_type = "S" if image_prompt_type  == 0 else "SE"
-        if model_type == "flf2v_720p" and not "E" in image_prompt_type:
-            image_prompt_type = "SE"
+        # if model_type == "flf2v_720p" and not "E" in image_prompt_type:
+        #     image_prompt_type = "SE"
         if video_settings_version <= 2:
             image_prompt_type = image_prompt_type.replace("G","")
         ui_defaults["image_prompt_type"] = image_prompt_type
@@ -1968,7 +1875,7 @@ def fix_settings(model_type, ui_defaults):
 
     audio_prompt_type = ui_defaults.get("audio_prompt_type", None)
     if video_settings_version < 2.2: 
-        if not model_type in ["vace_1.3B","vace_14B", "sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B", "ltxv_13B", "ltxv_13B_distilled"]:
+        if not model_type in ["vace_1.3B","vace_14B", "sky_df_1.3B", "sky_df_14B", "ltxv_13B"]:
             for p in  ["sliding_window_size", "sliding_window_overlap", "sliding_window_overlap_noise", "sliding_window_discard_last_frames"]:
                 if p in ui_defaults: del ui_defaults[p]
 
@@ -1979,7 +1886,7 @@ def fix_settings(model_type, ui_defaults):
 
 
     video_prompt_type = ui_defaults.get("video_prompt_type", "")
-    if model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_custom_audio", "hunyuan_avatar", "phantom_14B", "phantom_1.3B"]:
+    if model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_custom_audio", "hunyuan_avatar", "phantom_14B", "phantom_1.3B", "flux_dev_kontext"]:
         if not "I" in video_prompt_type:  # workaround for settings corruption
             video_prompt_type += "I" 
     if model_type in ["hunyuan"]:
@@ -2022,9 +1929,9 @@ def get_default_settings(model_type):
     i2v = test_class_i2v(model_type)
     defaults_filename = get_settings_file_name(model_type)
     if not Path(defaults_filename).is_file():
-        finetune_def = get_model_finetune_def(model_type)
-        if finetune_def != None:
-            ui_defaults = finetune_def["settings"] 
+        model_def = get_model_def(model_type)
+        if model_def != None:
+            ui_defaults = model_def["settings"] 
             if len(ui_defaults.get("prompt","")) == 0:
                 ui_defaults["prompt"]= get_default_prompt(i2v)
         else:    
@@ -2067,7 +1974,11 @@ def get_default_settings(model_type):
                     "guidance_scale": 7.0,
                 })
 
-            elif model_type in ["sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B"]:
+            elif model_type in ["flux_dev_kontext"]:
+                ui_defaults.update({
+                    "video_prompt_type": "I",
+                })
+            elif model_type in ["sky_df_1.3B", "sky_df_14B"]:
                 ui_defaults.update({
                     "guidance_scale": 6.0,
                     "flow_shift": 8,
@@ -2142,33 +2053,50 @@ def get_default_settings(model_type):
     return ui_defaults
 
 
-finetunes_paths =  glob.glob( os.path.join("finetunes", "*.json") ) 
-finetunes_paths.sort()
-for file_path in finetunes_paths:
-    finetune_id = os.path.basename(file_path)[:-5]
+def set_default_model_def(model_def, model_type):
+    if model_type == "flux_dev_kontext":
+        model_def.update({"image_outputs": True})
+
+
+models_def_paths =  glob.glob( os.path.join("defaults", "*.json") ) + glob.glob( os.path.join("finetunes", "*.json") ) 
+models_def_paths.sort()
+for file_path in models_def_paths:
+    model_type = os.path.basename(file_path)[:-5]
     with open(file_path, "r", encoding="utf-8") as f:
         try:
             json_def = json.load(f)
         except Exception as e:
-            raise Exception(f"Error while parsing Finetune Definition File '{file_path}': {str(e)}")
-        finetune_def = json_def["model"]
-        del json_def["model"]
-        finetune_def["settings"] = json_def
-    finetunes[finetune_id] = finetune_def
+            raise Exception(f"Error while parsing Model Definition File '{file_path}': {str(e)}")
+    model_def = json_def["model"]
+    model_def["path"] = file_path
+    del json_def["model"]      
+    settings = json_def   
+    existing_model_def = models_def.get(model_type, None) 
+    if existing_model_def is not None:
+        existing_settings = models_def["settings"]
+        existing_settings.update(settings)
+        existing_model_def.update(model_def)
+    else:
+        models_def[model_type] = model_def
+        set_default_model_def(model_def, model_type)
+        model_def["settings"] = settings
 
-model_types += [model_type for model_type, finetune in finetunes.items() if finetune.get("visible", True)]
-displayed_model_types= model_types
+model_types = models_def.keys()
+displayed_model_types= []
+for model_type in model_types:
+    model_def = get_model_def(model_type)
+    if not (model_def != None and model_def.get("visible", True) == False): 
+        displayed_model_types.append(model_type)
 
-# model_types += [model_type for model_type in abstract_model_types if model_type not in finetunes]
 
 transformer_types = server_config.get("transformer_types", [])
 transformer_type = server_config.get("last_model_type", None)
 advanced = server_config.get("last_advanced_choice", False)
 if args.advanced: advanced = True 
 
-if transformer_type != None and not transformer_type in model_types and not transformer_type in finetunes: transformer_type = None
+if transformer_type != None and not transformer_type in model_types and not transformer_type in models_def: transformer_type = None
 if transformer_type == None:
-    transformer_type = transformer_types[0] if len(transformer_types) > 0 else  model_types[0]
+    transformer_type = transformer_types[0] if len(transformer_types) > 0 else "t2v"
 
 transformer_quantization =server_config.get("transformer_quantization", "int8")
 
@@ -2222,18 +2150,11 @@ if  args.compile: #args.fastest or
     compile="transformer"
     lock_ui_compile = True
 
-#attention_mode="sage"
-#attention_mode="sage2"
-#attention_mode="flash"
-#attention_mode="sdpa"
-#attention_mode="xformers"
-# compile = "transformer"
-
 def save_quantized_model(model, model_type, model_filename, dtype,  config_file):
     if "quanto" in model_filename: return
-    finetune_def = get_model_finetune_def(model_type)
-    if finetune_def == None: return
-    URLs= finetune_def["URLs"]
+    model_def = get_model_def(model_type)
+    if model_def == None: return
+    URLs= model_def["URLs"]
     if isinstance(URLs, str):
         print("Unable to create a quantized model for a finetune that references external files")
         return
@@ -2258,16 +2179,13 @@ def save_quantized_model(model, model_type, model_filename, dtype,  config_file)
         print(f"New quantized file '{model_filename}' had been created for finetune Id '{model_type}'.")
         if not model_filename in URLs:
             URLs.append(model_filename)
-            finetune_def = finetune_def.copy()
-            if "settings" in finetune_def:
-                saved_def  = typing.OrderedDict() 
-                saved_def["model"] = finetune_def
-                saved_def.update(finetune_def["settings"])
-                del finetune_def["settings"]
-                finetune_file = os.path.join("finetunes" , model_type + ".json")
-                with open(finetune_file, "w", encoding="utf-8") as writer:
-                    writer.write(json.dumps(saved_def, indent=4))
-                print(f"The '{finetune_file}' definition file has been automatically updated with the local path to the new quantized model.")
+            finetune_file = os.path.join(os.path.dirname(model_def["path"]) , model_type + ".json")
+            with open(finetune_file, 'r', encoding='utf-8') as reader:
+                saved_finetune_def = json.load(reader)
+            saved_finetune_def["model"]["URLs"] = URLs
+            with open(finetune_file, "w", encoding="utf-8") as writer:
+                writer.write(json.dumps(saved_finetune_def, indent=4))
+            print(f"The '{finetune_file}' definition file has been automatically updated with the local path to the new quantized model.")
 
 def get_loras_preprocessor(transformer, model_type):
     preprocessor =  getattr(transformer, "preprocess_loras", None)
@@ -2279,15 +2197,6 @@ def get_loras_preprocessor(transformer, model_type):
 
     return preprocessor_wrapper
 
-        
-# def get_model_manager(model_family):
-#     if model_family == "wan":
-#         return None
-#     elif model_family == "ltxv":
-#         from ltxv import model_def
-#         return model_def
-#     else:
-#         raise Exception("model family not supported")
 
 def get_wan_text_encoder_filename(text_encoder_quantization):
     text_encoder_filename = "ckpts/umt5-xxl/models_t5_umt5-xxl-enc-bf16.safetensors"
@@ -2389,10 +2298,10 @@ def download_models(model_filename, model_type):
             urlretrieve(url,filename, create_progress_hook(filename))
 
     model_family = get_model_family(model_type)
-    finetune_def = get_model_finetune_def(model_type)
-    if finetune_def != None and not model_type in modules_files:
+    model_def = get_model_def(model_type)
+    if model_def != None and not model_type in modules_files:
         if not os.path.isfile(model_filename ):
-            URLs = get_finetune_URLs(model_type)
+            URLs = get_model_recursive_prop(model_type, "URLs")
             if not isinstance(URLs, str): # dont download anything right now if a base type is referenced as the download will occur just after
                 use_url = model_filename 
                 for url in URLs:
@@ -2400,7 +2309,7 @@ def download_models(model_filename, model_type):
                         use_url = url
                         break
                 if not url.startswith("http"):
-                    raise Exception(f"Model '{model_filename}' was not found locally and no URL was provided to download it. Please add an URL in the finetune definition file.")
+                    raise Exception(f"Model '{model_filename}' was not found locally and no URL was provided to download it. Please add an URL in the model definition file.")
                 try:
                     download_file(use_url, model_filename)
                 except Exception as e:
@@ -2408,11 +2317,14 @@ def download_models(model_filename, model_type):
                     raise Exception(f"URL '{use_url}' is invalid for Model '{model_filename}' : {str(e)}'")
                 model_filename = None
 
-        for url in finetune_def.get("preload_URLs", []):
+        preload_URLs = get_model_recursive_prop(model_type, "preload_URLs", return_list= True)
+        model_loras = get_model_recursive_prop(model_type, "loras", return_list= True)
+
+        for url in preload_URLs + model_loras:
             filename = "ckpts/" + url.split("/")[-1]
             if not os.path.isfile(filename ): 
                 if not url.startswith("http"):
-                    raise Exception(f"File '{filename}' to preload was not found locally and no URL was provided to download it. Please add an URL in the finetune definition file.")
+                    raise Exception(f"File '{filename}' to preload was not found locally and no URL was provided to download it. Please add an URL in the model definition file.")
                 try:
                     download_file(url, filename)
                 except Exception as e:
@@ -2420,21 +2332,21 @@ def download_models(model_filename, model_type):
                     raise Exception(f"Preload URL '{url}' is invalid: {str(e)}'")
     if model_family == "wan":        
         text_encoder_filename = get_wan_text_encoder_filename(text_encoder_quantization)    
-        model_def = {
+        model_files = {
             "repoId" : "DeepBeepMeep/Wan2.1", 
             "sourceFolderList" :  ["xlm-roberta-large", "umt5-xxl", ""  ],
             "fileList" : [ [ "models_clip_open-clip-xlm-roberta-large-vit-huge-14-bf16.safetensors", "sentencepiece.bpe.model", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json"], ["special_tokens_map.json", "spiece.model", "tokenizer.json", "tokenizer_config.json"] + computeList(text_encoder_filename) , ["Wan2.1_VAE.safetensors",  "fantasy_proj_model.safetensors" ] +  computeList(model_filename) ]   
         }
     elif model_family == "ltxv":
         text_encoder_filename = get_ltxv_text_encoder_filename(text_encoder_quantization)    
-        model_def = {
+        model_files = {
             "repoId" : "DeepBeepMeep/LTX_Video", 
             "sourceFolderList" :  ["T5_xxl_1.1",  ""  ],
             "fileList" : [ ["added_tokens.json", "special_tokens_map.json", "spiece.model", "tokenizer_config.json"] + computeList(text_encoder_filename), ["ltxv_0.9.7_VAE.safetensors", "ltxv_0.9.7_spatial_upscaler.safetensors", "ltxv_scheduler.json"] + computeList(model_filename) ]   
         }
     elif model_family == "hunyuan":
         text_encoder_filename = get_hunyuan_text_encoder_filename(text_encoder_quantization)    
-        model_def = {  
+        model_files = {  
             "repoId" : "DeepBeepMeep/HunyuanVideo", 
             "sourceFolderList" :  [ "llava-llama-3-8b", "clip_vit_large_patch14",  "whisper-tiny" , "det_align", ""  ],
             "fileList" :[ ["config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "preprocessor_config.json"] + computeList(text_encoder_filename) ,
@@ -2444,12 +2356,31 @@ def download_models(model_filename, model_type):
                           [ "hunyuan_video_720_quanto_int8_map.json", "hunyuan_video_custom_VAE_fp32.safetensors", "hunyuan_video_custom_VAE_config.json", "hunyuan_video_VAE_fp32.safetensors", "hunyuan_video_VAE_config.json" , "hunyuan_video_720_quanto_int8_map.json"   ] + computeList(model_filename)  
                          ]
         } 
+    elif model_family == "flux":
+        text_encoder_filename = get_ltxv_text_encoder_filename(text_encoder_quantization)    
+        model_files = [
+            {  
+            "repoId" : "DeepBeepMeep/Flux", 
+            "sourceFolderList" :  [""],
+            "fileList" : [ ["flux_vae.safetensors"] ]   
+            },
+            {  
+            "repoId" : "DeepBeepMeep/LTX_Video", 
+            "sourceFolderList" :  ["T5_xxl_1.1"],
+            "fileList" : [ ["added_tokens.json", "special_tokens_map.json", "spiece.model", "tokenizer_config.json"] + computeList(text_encoder_filename)  ]   
+            },
+            {  
+            "repoId" : "DeepBeepMeep/HunyuanVideo", 
+            "sourceFolderList" :  [  "clip_vit_large_patch14",   ],
+            "fileList" :[ 
+                          ["config.json", "merges.txt", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "vocab.json"],
+                         ]
+            } 
+        ]
 
-    # else:
-    #     model_manager = get_model_manager(model_family)
-    #     model_def = model_manager.get_files_def(model_filename, text_encoder_quantization)
-
-    process_files_def(**model_def)
+    if not isinstance(model_files, list): model_files = [model_files]
+    for one_repo in model_files:
+        process_files_def(**one_repo)
 
 offload.default_verboseLevel = verbose_level
 
@@ -2543,13 +2474,13 @@ def setup_loras(model_type, transformer,  lora_dir, lora_preselected_preset, spl
     return loras, loras_names, loras_presets, default_loras_choices, default_loras_multis_str, default_lora_preset_prompt, default_lora_preset
 
 
-def load_wan_model(model_filename, model_type, base_model_type, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized= False):
+def load_wan_model(model_filename, model_type, base_model_type, model_def, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized= False):
     if test_class_i2v(base_model_type):
         cfg = WAN_CONFIGS['i2v-14B']
     else:
         cfg = WAN_CONFIGS['t2v-14B']
         # cfg = WAN_CONFIGS['t2v-1.3B']    
-    if base_model_type in ("sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B"):
+    if base_model_type in ("sky_df_1.3B", "sky_df_14B"):
         model_factory = wan.DTT2V
     else:
         model_factory = wan.WanAny2V
@@ -2573,12 +2504,13 @@ def load_wan_model(model_filename, model_type, base_model_type, quantizeTransfor
         pipe["text_encoder_2"] = wan_model.clip.model
     return wan_model, pipe
 
-def load_ltxv_model(model_filename, model_type, base_model_type, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized = False):
+def load_ltxv_model(model_filename, model_type, base_model_type, model_def, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized = False):
     from ltx_video.ltxv import LTXV
 
     ltxv_model = LTXV(
         model_filepath = model_filename,
         text_encoder_filepath = get_ltxv_text_encoder_filename(text_encoder_quantization),
+        model_def = model_def,
         dtype = dtype,
         # quantizeTransformer = quantizeTransformer,
         VAE_dtype = VAE_dtype, 
@@ -2590,7 +2522,28 @@ def load_ltxv_model(model_filename, model_type, base_model_type, quantizeTransfo
 
     return ltxv_model, pipe
 
-def load_hunyuan_model(model_filename, model_type = None,  base_model_type = None, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized = False):
+
+def load_flux_model(model_filename, model_type, base_model_type, model_def, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized = False):
+    from flux.flux_main  import model_factory
+
+    flux_model = model_factory(
+        checkpoint_dir="ckpts",
+        model_filename=model_filename,
+        model_type = model_type, 
+        base_model_type=base_model_type,
+        text_encoder_filename= get_ltxv_text_encoder_filename(text_encoder_quantization),
+        quantizeTransformer = quantizeTransformer,
+        dtype = dtype,
+        VAE_dtype = VAE_dtype, 
+        mixed_precision_transformer = mixed_precision_transformer,
+        save_quantized = save_quantized
+    )
+
+    pipe = { "transformer": flux_model.model, "vae" : flux_model.vae, "text_encoder" : flux_model.clip, "text_encoder_2" : flux_model.t5}
+
+    return flux_model, pipe
+
+def load_hunyuan_model(model_filename, model_type = None,  base_model_type = None, model_def = None, quantizeTransformer = False, dtype = torch.bfloat16, VAE_dtype = torch.float32, mixed_precision_transformer = False, save_quantized = False):
     from hyvideo.hunyuan import HunyuanVideoSampler
 
     hunyuan_model = HunyuanVideoSampler.from_pretrained(
@@ -2634,21 +2587,20 @@ def get_transformer_model(model):
 
 
 def load_models(model_type):
-    global transformer_type, transformer_loras_filenames
+    global transformer_type
     base_model_type = get_base_model_type(model_type)
-    finetune_def = get_model_finetune_def(model_type)
+    model_def = get_model_def(model_type)
     preload =int(args.preload)
-    save_quantized = args.save_quantized and finetune_def != None
+    save_quantized = args.save_quantized and model_def != None
     model_filename = get_model_filename(model_type=model_type, quantization= "" if save_quantized else transformer_quantization, dtype_policy = transformer_dtype_policy) 
-    modules = finetune_def.get("modules", []) if finetune_def != None else []
+    modules = get_model_recursive_prop(model_type, "modules", return_list= True)
     if save_quantized and "quanto" in model_filename:
         save_quantized = False
         print("Need to provide a non quantized model to create a quantized model to be saved") 
     if save_quantized and len(modules) > 0:
-        _, model_types_no_module =  dependent_models_types = get_dependent_models(base_model_type, transformer_quantization, transformer_dtype_policy) 
         print(f"Unable to create a finetune quantized model as some modules are declared in the finetune definition. If your finetune includes already the module weights you can remove the 'modules' entry and try again. If not you will need also to change temporarly the model 'architecture' to an architecture that wont require the modules part ('{model_types_no_module[0] if len(model_types_no_module)>0 else ''}' ?) to quantize and then add back the original 'modules' and 'architecture' entries.")
         save_quantized = False
-    quantizeTransformer = not save_quantized and finetune_def !=None and transformer_quantization in ("int8", "fp8") and finetune_def.get("auto_quantize", False) and not "quanto" in model_filename
+    quantizeTransformer = not save_quantized and model_def !=None and transformer_quantization in ("int8", "fp8") and model_def.get("auto_quantize", False) and not "quanto" in model_filename
     if quantizeTransformer and len(modules) > 0:
         print(f"Autoquantize is not yet supported if some modules are declared")
         quantizeTransformer = False
@@ -2660,22 +2612,16 @@ def load_models(model_type):
     perc_reserved_mem_max = args.perc_reserved_mem_max
     if preload == 0:
         preload = server_config.get("preload_in_VRAM", 0)
-    new_transformer_loras_filenames = None
-    dependent_models, dependent_models_types = get_dependent_models(model_type, quantization= transformer_quantization, dtype_policy = transformer_dtype) 
-    new_transformer_loras_filenames = [model_filename]  if "_lora" in model_filename else None
-    
-    model_file_list = dependent_models + [model_filename]
-    model_type_list = dependent_models_types + [model_type]
+    model_file_list = [model_filename]
+    model_type_list = [model_type]
     new_transformer_filename = model_file_list[-1] 
     for module_type in modules:
         model_file_list.append(get_model_filename(module_type, transformer_quantization, transformer_dtype, is_module= True))
-
         model_type_list.append(module_type)
     for filename, file_model_type in zip(model_file_list, model_type_list): 
         download_models(filename, file_model_type)
     VAE_dtype = torch.float16 if server_config.get("vae_precision","16") == "16" else torch.float
     mixed_precision_transformer =  server_config.get("mixed_precision","0") == "1"
-    transformer_loras_filenames = None
     transformer_type = None
     for i, filename in enumerate(model_file_list):
         if i==0:  
@@ -2684,11 +2630,13 @@ def load_models(model_type):
             print(f"Loading Module '{filename}' ...")
 
     if model_family == "wan" :
-        wan_model, pipe = load_wan_model(model_file_list, model_type, base_model_type, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
+        wan_model, pipe = load_wan_model(model_file_list, model_type, base_model_type, model_def, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
     elif model_family == "ltxv":
-        wan_model, pipe = load_ltxv_model(model_file_list, model_type, base_model_type, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
+        wan_model, pipe = load_ltxv_model(model_file_list, model_type, base_model_type, model_def, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
+    elif model_family == "flux":
+        wan_model, pipe = load_flux_model(model_file_list, model_type, base_model_type, model_def, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
     elif model_family == "hunyuan":
-        wan_model, pipe = load_hunyuan_model(model_file_list, model_type, base_model_type, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
+        wan_model, pipe = load_hunyuan_model(model_file_list, model_type, base_model_type, model_def, quantizeTransformer = quantizeTransformer, dtype = transformer_dtype, VAE_dtype = VAE_dtype, mixed_precision_transformer = mixed_precision_transformer, save_quantized = save_quantized)
     else:
         raise Exception(f"Model '{new_transformer_filename}' not supported.")
     wan_model._model_file_name = new_transformer_filename
@@ -2720,7 +2668,6 @@ def load_models(model_type):
     offloadobj = offload.profile(pipe, profile_no= profile, compile = compile, quantizeTransformer = False, loras = "transformer", coTenantsMap= {}, perc_reserved_mem_max = perc_reserved_mem_max , convertWeightsFloatTo = transformer_dtype, **kwargs)  
     if len(args.gpu) > 0:
         torch.set_default_device(args.gpu)
-    transformer_loras_filenames = new_transformer_loras_filenames
     transformer_type = model_type
     return wan_model, offloadobj, pipe["transformer"] 
 
@@ -3054,7 +3001,7 @@ def finalize_generation(state):
     return gr.Gallery(selected_index=choice), gr.Button(interactive=  True), gr.Button(visible= True), gr.Button(visible= False), gr.Column(visible= False), gr.HTML(visible= False, value="")
 
 def get_default_video_info():
-    return "Please Select a Video"    
+    return "Please Select an Video / Image"    
 
 
 def get_file_list(state, input_file_list):
@@ -3093,14 +3040,23 @@ def select_video(state, input_file_list, event_data: gr.EventData):
     if len(file_list) > 0:
         configs = file_settings_list[choice]
         file_name = file_list[choice]
-        fps, width, height, frames_count = get_video_info(file_name)
-        nb_audio_tracks = extract_audio_tracks(file_name,query_only = True)
         values = [  os.path.basename(file_name)]
         labels = [ "File Name"]
         misc_values= []
         misc_labels = []
         pp_values= []
         pp_labels = []
+        extension = os.path.splitext(file_name)[-1]
+        if not extension in [".mp4"]:
+            img = Image.open(file_name)
+            width, height = img.size
+            configs = None
+            is_image = True
+            nb_audio_tracks = 0
+        else:
+            fps, width, height, frames_count = get_video_info(file_name)
+            is_image = False
+            nb_audio_tracks = extract_audio_tracks(file_name,query_only = True)
         if configs != None:
             video_model_name =  configs.get("type", "Unknown model")
             if "-" in video_model_name: video_model_name =  video_model_name[video_model_name.find("-")+2:] 
@@ -3128,8 +3084,12 @@ def select_video(state, input_file_list, event_data: gr.EventData):
             labels += misc_labels
             video_creation_date = str(get_file_creation_date(file_name))
             if "." in video_creation_date: video_creation_date = video_creation_date[:video_creation_date.rfind(".")]
-            values += [f"{width}x{height}",  f"{frames_count} frames (duration={frames_count/fps:.1f} s, fps={round(fps)})"]
-            labels += ["Resolution", "Frames"]
+            if is_image:
+                values += [f"{width}x{height}"]
+                labels += ["Resolution"]
+            else:
+                values += [f"{width}x{height}",  f"{frames_count} frames (duration={frames_count/fps:.1f} s, fps={round(fps)})"]
+                labels += ["Resolution", "Frames"]
             if nb_audio_tracks  > 0:
                 values +=[nb_audio_tracks]
                 labels +=["Nb Audio Tracks"]
@@ -3246,8 +3206,7 @@ def select_video(state, input_file_list, event_data: gr.EventData):
     else:
         html =  get_default_video_info()
     visible= len(file_list) > 0
-    return choice, html, gr.update(visible=visible), gr.update(visible=visible) 
-
+    return choice, html, gr.update(visible=visible and not is_image) , gr.update(visible=visible and is_image), gr.update(visible=visible and is_image) 
 def expand_slist(slist, num_inference_steps ):
     new_slist= []
     inc =  len(slist) / num_inference_steps 
@@ -3834,6 +3793,14 @@ def edit_video(
         cleanup_temp_audio_files(audio_tracks)
     clear_status(state)
 
+def get_transformer_loras(model_type):
+    model_def = get_model_def(model_type)
+    transformer_loras_filenames = get_model_recursive_prop(model_type, "loras", return_list=True)
+    transformer_loras_filenames = [ "ckpts/" + os.path.basename(filename) for filename in transformer_loras_filenames]
+    transformer_loras_multipliers = get_model_recursive_prop(model_type, "loras_multipliers", return_list=True) + [1.] * len(transformer_loras_filenames)
+    transformer_loras_multipliers = transformer_loras_multipliers[:len(transformer_loras_filenames)]
+    return transformer_loras_filenames, transformer_loras_multipliers
+
 def generate_video(
     task,
     send_cmd,
@@ -3914,7 +3881,9 @@ def generate_video(
         file_list = gen["file_list"]
         file_settings_list = gen["file_settings_list"]
 
-    prompt_no = gen["prompt_no"]
+
+    model_def = get_model_def(model_type) 
+    is_image = model_def.get("image_outputs", False)
 
     fit_canvas = server_config.get("fit_canvas", 0)
 
@@ -3967,7 +3936,8 @@ def generate_video(
 
     loras = state["loras"]
     loras_slists = []
-    if len(loras) > 0  or transformer_loras_filenames != None:
+    transformer_loras_filenames, transformer_loras_multipliers  = get_transformer_loras(model_type)
+    if len(loras) > 0  or len(transformer_loras_filenames) > 0 :
         def is_float(element: any) -> bool:
             if element is None: 
                 return False
@@ -4005,11 +3975,12 @@ def generate_video(
         lora_dir = get_lora_dir(model_type)     
         loras_selected = [ os.path.join(lora_dir, lora) for lora in activated_loras]
 
-        pinnedLora = profile !=5 and transformer_loras_filenames == None #False # # # 
+        pinnedLora = profile !=5  # and transformer_loras_filenames == None False # # # 
         split_linear_modules_map = getattr(trans,"split_linear_modules_map", None)
         if transformer_loras_filenames != None:
-            loras_selected += transformer_loras_filenames
-            loras_list_mult_choices_nums.append(1.)
+            loras_selected = transformer_loras_filenames + loras_selected
+            loras_list_mult_choices_nums = transformer_loras_multipliers + loras_list_mult_choices_nums
+            loras_slists = transformer_loras_multipliers + loras_slists
         offload.load_loras_into_model(trans, loras_selected, loras_list_mult_choices_nums, activate_all_loras=True, preprocess_sd=get_loras_preprocessor(trans, base_model_type), pinnedLora=pinnedLora, split_linear_modules_map = split_linear_modules_map) 
         errors = trans._loras_errors
         if len(errors) > 0:
@@ -4039,6 +4010,7 @@ def generate_video(
     hunyuan_avatar = "hunyuan_video_avatar" in model_filename
     fantasy = base_model_type in ["fantasy"]
     multitalk = base_model_type in ["multitalk", "vace_multitalk_14B"]
+    flux_dev_kontext = base_model_type in ["flux_dev_kontext"]
 
     if "L" in image_prompt_type:
         if len(file_list)>0:
@@ -4103,8 +4075,7 @@ def generate_video(
     if trans.enable_cache == "mag":
         trans.magcache_thresh = 0
         trans.magcache_K = 2
-        finetune_def = get_model_finetune_def(model_type) 
-        def_mag_ratios = finetune_def.get("magcache_ratios", None) if finetune_def != None else None
+        def_mag_ratios = model_def.get("magcache_ratios", None) if model_def != None else None
         if def_mag_ratios != None:
             trans.def_mag_ratios = def_mag_ratios
         elif get_model_family(model_type) == "wan":
@@ -4120,8 +4091,8 @@ def generate_video(
 
     elif trans.enable_cache == "tea":
         trans.rel_l1_thresh = 0
-        finetune_def = get_model_finetune_def(model_type)        
-        def_tea_coefficients = finetune_def.get("teacache_coefficients", None) if finetune_def != None else None
+        model_def = get_model_def(model_type)        
+        def_tea_coefficients = model_def.get("teacache_coefficients", None) if model_def != None else None
         if def_tea_coefficients != None:
             trans.coefficients = def_tea_coefficients
         elif get_model_family(model_type) == "wan":
@@ -4272,7 +4243,7 @@ def generate_video(
                 abort = gen.get("abort", False)
 
         while not abort:
-            enable_RIFLEx = RIFLEx_setting == 0 and current_video_length > (6* get_model_fps(base_model_type)) or RIFLEx_setting == 1
+            enable_RIFLEx = RIFLEx_setting == 0 and current_video_length > (6* get_model_fps(base_model_type)+1) or RIFLEx_setting == 1
             if sliding_window:
                 prompt =  prompts[window_no] if window_no < len(prompts) else prompts[-1]
             new_extra_windows = gen.get("extra_windows",0)
@@ -4308,7 +4279,7 @@ def generate_video(
                 audio_proj_split = get_window_audio_embeddings(audio_proj_full, audio_start_idx= window_start_frame, clip_length = current_video_length)
             if i2v and window_no > 1:
                 src_video = pre_video_guide
-            if hunyuan_custom or hunyuan_avatar:
+            if hunyuan_custom or hunyuan_avatar or flux_dev_kontext:
                 src_ref_images  = image_refs
             elif phantom:
                 src_ref_images = image_refs.copy() if image_refs != None else None
@@ -4455,7 +4426,7 @@ def generate_video(
                     input_video= pre_video_guide  if diffusion_forcing or ltxv or hunyuan_custom_edit else source_video,
                     denoising_strength=denoising_strength,
                     target_camera= target_camera,
-                    frame_num=(current_video_length // latent_size)* latent_size + 1,
+                    frame_num=current_video_length if is_image else (current_video_length // latent_size)* latent_size + 1,
                     height =  height,
                     width = width,
                     fit_into_canvas = fit_canvas == 1,
@@ -4608,14 +4579,27 @@ def generate_video(
 
                 time_flag = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d-%Hh%Mm%Ss")
                 save_prompt = original_prompts[0]
+
                 from wan.utils.utils import truncate_for_filesystem
+                extension = "jpg" if is_image else "mp4" 
+
                 if os.name == 'nt':
-                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(truncate_for_filesystem(save_prompt,50)).strip()}.mp4"
+                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(truncate_for_filesystem(save_prompt,50)).strip()}.{extension}"
                 else:
-                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(truncate_for_filesystem(save_prompt,100)).strip()}.mp4"
+                    file_name = f"{time_flag}_seed{seed}_{sanitize_file_name(truncate_for_filesystem(save_prompt,100)).strip()}.{extension}"
                 video_path = os.path.join(save_path, file_name)
                 any_mmaudio = MMAudio_setting != 0 and server_config.get("mmaudio_enabled", 0) != 0 and sample.shape[1] >=fps
-                if len(control_audio_tracks) > 0 or source_audio != None or any_mmaudio or merged_audio_data is not None:
+
+                if is_image:
+                    sample =  sample.permute(1,2,3,0)  #c f h w -> f h w c
+                    new_video_path = []
+                    for no, img in enumerate(sample):  
+                        img = Image.fromarray((127.5 * (img + 1.0)).cpu().byte().numpy())
+                        img_path = os.path.splitext(video_path)[0] + ("" if no==0 else f"_{no}") + ".jpg" 
+                        new_video_path.append(img_path)
+                        img.save(img_path)
+                    video_path= new_video_path
+                elif len(control_audio_tracks) > 0 or source_audio != None or any_mmaudio or merged_audio_data is not None:
                     save_path_tmp = video_path[:-4] + "_tmp.mp4"
                     cache_video( tensor=sample[None], save_file=save_path_tmp, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1))
                     if len(control_audio_tracks) > 0:
@@ -4653,21 +4637,26 @@ def generate_video(
                 if prompt_enhancer_image_caption_model != None and prompt_enhancer !=None and len(prompt_enhancer)>0:
                     configs["enhanced_prompt"] = "\n".join(prompts)
                 configs["generation_time"] = round(end_time-start_time)
+                if is_image: configs["is_image"] = True
                 metadata_choice = server_config.get("metadata_type","metadata")
-                if metadata_choice == "json":
-                    with open(video_path.replace('.mp4', '.json'), 'w') as f:
-                        json.dump(configs, f, indent=4)
-                elif metadata_choice == "metadata":
-                    from mutagen.mp4 import MP4
-                    file = MP4(video_path)
-                    file.tags['©cmt'] = [json.dumps(configs)]
-                    file.save()
-
-                print(f"New video saved to Path: "+video_path)
-                with lock:
-                    file_list.append(video_path)
-                    file_settings_list.append(configs)
-                
+                video_path = [video_path] if not isinstance(video_path, list) else video_path
+                for no, path in enumerate(video_path): 
+                    if metadata_choice == "json":
+                        with open(path.replace(f'.{extension}', '.json'), 'w') as f:
+                            json.dump(configs, f, indent=4)
+                    elif metadata_choice == "metadata" and not is_image:
+                        from mutagen.mp4 import MP4
+                        file = MP4(path)
+                        file.tags['©cmt'] = [json.dumps(configs)]
+                        file.save()
+                    if is_image:
+                        print(f"New image saved to Path: "+ path)
+                    else:
+                        print(f"New video saved to Path: "+ path)
+                    with lock:
+                        file_list.append(path)
+                        file_settings_list.append(configs if no > 0 else configs.copy())
+                    
                 # Play notification sound for single video
                 try:
                     if server_config.get("notification_sound_enabled", 1):
@@ -4698,7 +4687,7 @@ def prepare_generate_video(state):
 
 def generate_preview(latents):
     import einops
-
+    # thanks Comfyui for the rgb factors
     model_family = get_model_family(transformer_type)
     if model_family == "wan":
         latent_channels = 16
@@ -4727,6 +4716,29 @@ def generate_preview(latents):
         latent_rgb_factors_bias = [-0.1835, -0.0868, -0.3360]
 
         # latent_rgb_factors_bias = [0.0259, -0.0192, -0.0761]
+    elif model_family =="flux":
+        scale_factor = 0.3611
+        shift_factor = 0.1159
+        latent_rgb_factors =[
+            [-0.0346,  0.0244,  0.0681],
+            [ 0.0034,  0.0210,  0.0687],
+            [ 0.0275, -0.0668, -0.0433],
+            [-0.0174,  0.0160,  0.0617],
+            [ 0.0859,  0.0721,  0.0329],
+            [ 0.0004,  0.0383,  0.0115],
+            [ 0.0405,  0.0861,  0.0915],
+            [-0.0236, -0.0185, -0.0259],
+            [-0.0245,  0.0250,  0.1180],
+            [ 0.1008,  0.0755, -0.0421],
+            [-0.0515,  0.0201,  0.0011],
+            [ 0.0428, -0.0012, -0.0036],
+            [ 0.0817,  0.0765,  0.0749],
+            [-0.1264, -0.0522, -0.1103],
+            [-0.0280, -0.0881, -0.0499],
+            [-0.1262, -0.0982, -0.0778]
+        ]
+        latent_rgb_factors_bias = [-0.0329, -0.0718, -0.0851]
+
     elif model_family == "ltxv":
         latent_channels = 128
         latent_dimensions = 3
@@ -5527,7 +5539,7 @@ def prepare_inputs_dict(target, inputs, model_type = None, model_filename = None
     base_model_type = get_base_model_type(model_type)
     if model_type != base_model_type:
         inputs["base_model_type"] = base_model_type
-    diffusion_forcing = base_model_type in ["sky_df_1.3B", "sky_df_14B", "sky_df_720p_14B"]
+    diffusion_forcing = base_model_type in ["sky_df_1.3B", "sky_df_14B"]
     vace =  test_vace_module(base_model_type) 
 
     if target == "settings":
@@ -5608,21 +5620,34 @@ def init_generate(state, input_file_list, last_choice):
 def video_to_control_video(state, input_file_list, choice):
     file_list, file_settings_list = get_file_list(state, input_file_list)
     if len(file_list) == 0 or choice == None or choice < 0 or choice > len(file_list): return gr.update()
-    gr.Info("Select Video was copied to Control Video input")
+    gr.Info("Selected Video was copied to Control Video input")
     return file_list[choice]
 
 def video_to_source_video(state, input_file_list, choice):
     file_list, file_settings_list = get_file_list(state, input_file_list)
     if len(file_list) == 0 or choice == None or choice < 0 or choice > len(file_list): return gr.update()
-    gr.Info("Select Video was copied to Source Video input")    
+    gr.Info("Selected Video was copied to Source Video input")    
     return file_list[choice]
-    
+
+def image_to_ref_image(state, input_file_list, choice, target, target_name):
+    file_list, file_settings_list = get_file_list(state, input_file_list)
+    if len(file_list) == 0 or choice == None or choice < 0 or choice > len(file_list): return gr.update()
+    gr.Info(f"Selected Image was copied to {target_name}")
+    if target == None:
+        target =[]
+    target.append( file_list[choice])
+    return target
+
+
 def apply_post_processing(state, input_file_list, choice, PP_temporal_upsampling, PP_spatial_upsampling, PP_MMAudio_setting, PP_MMAudio_prompt, PP_MMAudio_neg_prompt, PP_MMAudio_seed, PP_repeat_generation):
     gen = get_gen_info(state)
     file_list, file_settings_list = get_file_list(state, input_file_list)
     if len(file_list) == 0 or choice == None or choice < 0 or choice > len(file_list)  :
         return gr.update(), gr.update()
     
+    if not file_list[choice].endswith(".mp4"):
+        gr.Info("Post processing is only available with Videos")
+        return gr.update(), gr.update()
     overrides = {
         "temporal_upsampling":PP_temporal_upsampling,
         "spatial_upsampling":PP_spatial_upsampling,
@@ -5638,6 +5663,7 @@ def apply_post_processing(state, input_file_list, choice, PP_temporal_upsampling
 
     in_progress = gen.get("in_progress", False)
     return "edit", get_unique_id() if not in_progress else gr.update(), get_unique_id() if in_progress else gr.update()
+
 
 def eject_video_from_gallery(state, input_file_list, choice):
     gen = get_gen_info(state)
@@ -5754,7 +5780,7 @@ def get_settings_from_file(state, file_path, allow_json, merge_with_defaults, sw
                 configs = json.load(f)
         except:
             pass
-    else:
+    elif file_path.endswith(".mp4"):
         from mutagen.mp4 import MP4
         try:
             file = MP4(file_path)
@@ -5778,7 +5804,7 @@ def get_settings_from_file(state, file_path, allow_json, merge_with_defaults, sw
         model_type = get_model_type(model_filename)
         if model_type == None:
             model_type = current_model_type
-    elif not model_type in model_types and not model_type in finetune_def:
+    elif not model_type in model_types:
         model_type = current_model_type
     fix_settings(model_type, configs)
     if switch_type_if_compatible and are_model_types_compatible(model_type,current_model_type):
@@ -6248,6 +6274,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
         gen = dict()
         gen["queue"] = []
         state_dict["gen"] = gen
+    model_def = get_model_def(model_type)
+    if model_def == None: model_def = {} 
     base_model_type = get_base_model_type(model_type)
     model_filename = get_model_filename( base_model_type )
     preset_to_load = lora_preselected_preset if lora_preset_model == model_type else "" 
@@ -6333,7 +6361,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             flf2v = base_model_type == "flf2v_720p"
             diffusion_forcing = "diffusion_forcing" in model_filename 
             ltxv = "ltxv" in model_filename 
-            ltxv_distilled = "ltxv" in model_filename and "distilled" in model_filename 
+            lock_inference_steps = model_def.get("lock_inference_steps", False)
             recammaster = "recam" in model_filename
             vace = test_vace_module(base_model_type)
             phantom = "phantom" in model_filename
@@ -6345,11 +6373,19 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             hunyuan_video_custom_audio = hunyuan_video_custom  and "audio" in model_filename
             hunyuan_video_custom_edit = hunyuan_video_custom  and "edit" in model_filename
             hunyuan_video_avatar = "hunyuan_video_avatar" in model_filename
+            flux_dev_kontext =  base_model_type in ["flux_dev_kontext"]
+            image_outputs = model_def.get("image_outputs", False)
             sliding_window_enabled = test_any_sliding_window(model_type)
             multi_prompts_gen_type_value = ui_defaults.get("multi_prompts_gen_type_value",0)
             prompt_label, wizard_prompt_label = get_prompt_labels(multi_prompts_gen_type_value)            
             any_video_source = True
             fps = get_model_fps(base_model_type)
+            image_prompt_type_value = ""
+            video_prompt_type_value = ""
+            any_start_image = False
+            any_end_image = False
+            any_reference_image = False
+
             with gr.Column(visible= test_class_i2v(model_type) or diffusion_forcing or ltxv or recammaster or vace) as image_prompt_column: 
                 if vace:
                     image_prompt_type_value= ui_defaults.get("image_prompt_type","")
@@ -6417,11 +6453,13 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     keep_frames_video_source = gr.Text(visible=False)
                 else:
                     if test_class_i2v(model_type):
-                        image_prompt_type_value= ui_defaults.get("image_prompt_type","SE" if flf2v else "S" )
-                        image_prompt_type_choices = [] if flf2v else [("Use only a Start Image", "S")]
+                        # image_prompt_type_value= ui_defaults.get("image_prompt_type","SE" if flf2v else "S" )
+                        image_prompt_type_value= ui_defaults.get("image_prompt_type","S" )
+                        image_prompt_type_choices = [("Use only a Start Image", "S")]
                         image_prompt_type_choices += [("Use both a Start and an End Image", "SE")]
                         image_prompt_type = gr.Radio( image_prompt_type_choices, value =image_prompt_type_value, label="Location", show_label= False, visible= not hunyuan_i2v, scale= 3)
-
+                        any_start_image = True
+                        any_end_image = True
                         image_start = gr.Gallery(preview= True,
                                 label="Images as starting points for new videos", type ="pil", #file_types= "image", 
                                 columns=[3], rows=[1], object_fit="contain", height="auto", selected_index=0, interactive= True, value= ui_defaults.get("image_start", None), visible= "S" in image_prompt_type_value) 
@@ -6438,7 +6476,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     keep_frames_video_source = gr.Text(visible=False)
                     any_video_source = False
 
-            with gr.Column(visible= vace or phantom or hunyuan_video_custom or hunyuan_video_avatar or hunyuan_video_custom_edit or t2v) as video_prompt_column: 
+            with gr.Column(visible= vace or phantom or hunyuan_video_custom or hunyuan_video_avatar or hunyuan_video_custom_edit or t2v or flux_dev_kontext) as video_prompt_column: 
                 video_prompt_type_value= ui_defaults.get("video_prompt_type","")
                 video_prompt_type = gr.Text(value= video_prompt_type_value, visible= False)
                 any_control_video = True
@@ -6489,7 +6527,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
 
                     # video_prompt_video_guide_trigger = gr.Text(visible=False, value="")
                     if t2v:
-                        video_prompt_type_video_mask = gr.Dropdown(value = "", visible = False)
+                        video_prompt_type_video_mask = gr.Dropdown(value = "", choices = [""], visible = False)
                     elif hunyuan_video_custom_edit:
                         video_prompt_type_video_mask = gr.Dropdown(
                             choices=[
@@ -6520,7 +6558,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             label="Area Processed", scale = 2
                         )
                     if t2v:
-                        video_prompt_type_image_refs = gr.Dropdown(value="", visible =False)
+                        video_prompt_type_image_refs = gr.Dropdown(value="", label="Ref Image", choices=[""], visible =False)
                     elif vace:
                         video_prompt_type_image_refs = gr.Dropdown(
                             choices=[
@@ -6561,7 +6599,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                 video_mask = gr.Video(label= "Video Mask Area (for Inpainting, white = Control Area, black = Unchanged)", visible= "V" in video_prompt_type_value and "A" in video_prompt_type_value and not "U" in video_prompt_type_value , value= ui_defaults.get("video_mask", None)) 
 
                 mask_expand = gr.Slider(-10, 50, value=ui_defaults.get("mask_expand", 0), step=1, label="Expand / Shrink Mask Area", visible= "V" in video_prompt_type_value and "A" in video_prompt_type_value and not "U" in video_prompt_type_value )
-
+                any_reference_image = vace or phantom or hunyuan_video_custom or hunyuan_video_avatar
                 image_refs = gr.Gallery(preview= True, label ="Start Image" if hunyuan_video_avatar else "Reference Images",
                         type ="pil",   show_label= True,
                         columns=[3], rows=[1], object_fit="contain", height="auto", selected_index=0, interactive= True, visible= "I" in video_prompt_type_value, 
@@ -6576,7 +6614,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         # ("Keep it for first Image (landscape) and remove it for other Images (objects / people)", 2),
                     ],
                     value=ui_defaults.get("remove_background_images_ref",1),
-                    label="Automatic Removal of Background of People or Objects (Only)", scale = 3, visible= "I" in video_prompt_type_value and not hunyuan_video_avatar
+                    label="Automatic Removal of Background of People or Objects (Only)", scale = 3, visible= "I" in video_prompt_type_value and not hunyuan_video_avatar and not flux_dev_kontext
                 )
 
             any_audio_voices_support = any_audio_track(base_model_type)
@@ -6655,8 +6693,10 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     label= label 
                 )
             with gr.Row():
-                if recammaster:
-                    video_length = gr.Slider(5, 193, value=ui_defaults.get("video_length", 81), step=4, label="Number of frames (16 = 1s), locked", interactive= False)
+                if image_outputs:
+                    video_length = gr.Slider(1, 16, value=ui_defaults.get("video_length", 1), step=1, label="Number of Images to Generate", visible = flux_dev_kontext)
+                elif recammaster:
+                    video_length = gr.Slider(5, 193, value=ui_defaults.get("video_length", 81), step=4, label="Number of frames (16 = 1s), locked", interactive= False, visible = True)
                 else:
                     min_frames, frames_step = get_model_min_frames_and_step(base_model_type)
 
@@ -6664,8 +6704,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         "video_length", 81 if get_model_family(base_model_type)=="wan" else 97), 
                          step=frames_step, label=f"Number of frames ({fps} = 1s)", interactive= True)
 
-            with gr.Row(visible = not ltxv_distilled) as inference_steps_row:                                       
-                num_inference_steps = gr.Slider(1, 100, value=ui_defaults.get("num_inference_steps",30), step=1, label="Number of Inference Steps")
+            with gr.Row(visible = not lock_inference_steps) as inference_steps_row:                                       
+                num_inference_steps = gr.Slider(1, 100, value=ui_defaults.get("num_inference_steps",30), step=1, label="Number of Inference Steps", visible = True)
 
 
 
@@ -6679,7 +6719,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             guidance_scale = gr.Slider(1.0, 20.0, value=ui_defaults.get("guidance_scale",5), step=0.5, label="Guidance (CFG)", visible=not (hunyuan_t2v or hunyuan_i2v))
                             audio_guidance_scale = gr.Slider(1.0, 20.0, value=ui_defaults.get("audio_guidance_scale", 5 if fantasy else 4), step=0.5, label="Audio Guidance", visible=fantasy or multitalk)
                             embedded_guidance_scale = gr.Slider(1.0, 20.0, value=6.0, step=0.5, label="Embedded Guidance Scale", visible=(hunyuan_t2v or hunyuan_i2v))
-                            flow_shift = gr.Slider(1.0, 25.0, value=ui_defaults.get("flow_shift",3), step=0.1, label="Shift Scale") 
+                            flow_shift = gr.Slider(1.0, 25.0, value=ui_defaults.get("flow_shift",3), step=0.1, label="Shift Scale", visible = not image_outputs) 
                         with gr.Row(visible = get_model_family(model_type) == "wan" and not diffusion_forcing ) as sample_solver_row:
                             sample_solver = gr.Dropdown( value=ui_defaults.get("sample_solver",""), 
                                 choices=[
@@ -6693,7 +6733,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         with gr.Row(visible = vace):
                             control_net_weight = gr.Slider(0.0, 2.0, value=ui_defaults.get("control_net_weight",1), step=0.1, label="Control Net Weight #1", visible=vace)
                             control_net_weight2 = gr.Slider(0.0, 2.0, value=ui_defaults.get("control_net_weight2",1), step=0.1, label="Control Net Weight #2", visible=vace)
-                        negative_prompt = gr.Textbox(label="Negative Prompt (ignored if no Guidance that is if CFG = 1)", value=ui_defaults.get("negative_prompt", "") )
+                        negative_prompt = gr.Textbox(label="Negative Prompt (ignored if no Guidance that is if CFG = 1)", value=ui_defaults.get("negative_prompt", ""), visible =  vace or t2v or test_class_i2v(model_type) )
                         with gr.Column(visible = vace or t2v or test_class_i2v(model_type)) as NAG_col:
                             gr.Markdown("<B>NAG enforces Negative Prompt even if no Guidance is set (CFG = 1), set NAG Scale to > 1 to enable it</B>")
                             with gr.Row():
@@ -6701,7 +6741,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 NAG_tau = gr.Slider(1.0, 5.0, value=ui_defaults.get("NAG_tau",3.5), step=0.1, label="NAG Tau", visible = True)
                                 NAG_alpha = gr.Slider(1.0, 2.0, value=ui_defaults.get("NAG_alpha",.5), step=0.1, label="NAG Alpha", visible = True)
                         with gr.Row():
-                            repeat_generation = gr.Slider(1, 25.0, value=ui_defaults.get("repeat_generation",1), step=1, label="Num. of Generated Videos per Prompt") 
+                            repeat_generation = gr.Slider(1, 25.0, value=ui_defaults.get("repeat_generation",1), step=1, label="Num. of Generated Videos per Prompt", visible = not image_outputs) 
                             multi_images_gen_type = gr.Dropdown( value=ui_defaults.get("multi_images_gen_type",0), 
                                 choices=[
                                     ("Generate every combination of images and texts", 0),
@@ -6720,7 +6760,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             label="Activated Loras"
                         )
                         loras_multipliers = gr.Textbox(label="Loras Multipliers (1.0 by default) separated by Space chars or CR, lines that start with # are ignored", value=launch_multis_str)
-                with gr.Tab("Steps Skipping", visible = not ltxv) as speed_tab:
+                with gr.Tab("Steps Skipping", visible = not (ltxv or image_outputs)) as speed_tab:
                     with gr.Column():
                         gr.Markdown("<B>Tea Cache and Mag Cache accelerate the Video Generation by skipping intelligently some steps, the more steps are skipped the lower the quality of the video.</B>")
                         gr.Markdown("<B>Steps Skipping  consumes also VRAM. It is recommended not to skip at least the first 10% steps.</B>")
@@ -6763,7 +6803,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                     ("Rife x4 frames/s", "rife4"), 
                                 ],
                                 value=temporal_upsampling,
-                                visible=True,
+                                visible=not image_outputs,
                                 scale = 1,
                                 label="Temporal Upsampling",
                                 elem_classes= element_class
@@ -6785,7 +6825,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             return temporal_upsampling, spatial_upsampling
                         temporal_upsampling, spatial_upsampling = gen_upsampling_dropdowns(ui_defaults.get("temporal_upsampling", ""), ui_defaults.get("spatial_upsampling", ""))
 
-                with gr.Tab("MMAudio", visible = server_config.get("mmaudio_enabled", 0) != 0 and not any_audio_track(base_model_type)) as mmaudio_tab:
+                with gr.Tab("MMAudio", visible = server_config.get("mmaudio_enabled", 0) != 0 and not any_audio_track(base_model_type) and not image_outputs) as mmaudio_tab:
                     with gr.Column():
                         gr.Markdown("<B>Add a soundtrack based on the content of the Generated Video</B>")
                         def gen_mmaudio_dropdowns(MMAudio_setting, MMAudio_prompt, MMAudio_neg_prompt, MMAudio_seed = None, element_class = None, max_height = None ):
@@ -6812,7 +6852,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         MMAudio_setting, MMAudio_prompt, MMAudio_neg_prompt, _  =  gen_mmaudio_dropdowns(ui_defaults.get("MMAudio_setting", 0), ui_defaults.get("MMAudio_prompt", ""), ui_defaults.get("MMAudio_neg_prompt", ""))
 
 
-                with gr.Tab("Quality", visible = not ltxv) as quality_tab:
+                with gr.Tab("Quality", visible = not (ltxv or flux_dev_kontext)) as quality_tab:
                         with gr.Column(visible = not (hunyuan_i2v or hunyuan_t2v or hunyuan_video_custom or hunyuan_video_avatar) ) as skip_layer_guidance_row:
                             gr.Markdown("<B>Skip Layer Guidance (improves video quality, requires guidance > 1)</B>")
                             with gr.Row():
@@ -6903,7 +6943,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             label="Text Prompts separated by a Carriage Return"
                         )
                         
-                with gr.Tab("Misc.") as misc_tab:
+                with gr.Tab("Misc.", visible = not image_outputs) as misc_tab:
                     with gr.Column(visible = not (recammaster or ltxv or diffusion_forcing)) as RIFLEx_setting_col:
                         gr.Markdown("<B>With Riflex you can generate videos longer than 5s which is the default duration of videos used to train the model</B>")
                         RIFLEx_setting = gr.Dropdown(
@@ -6974,13 +7014,19 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             with gr.Accordion("Video Info and Late Post Processing", open=False) as video_info_accordion:
                 with gr.Tabs() as video_info_tabs:
                     with gr.Tab("Information", id="video_info"):
+                        default_visibility = {} if update_form else {"visible" : False}                        
                         video_info = gr.HTML(visible=True, min_height=100, value=get_default_video_info()) 
-                        with gr.Row(visible= False) as video_buttons_row:
+                        with gr.Row(**default_visibility) as video_buttons_row:
                             video_info_extract_settings_btn = gr.Button("Extract Settings", size ="sm")
                             video_info_to_control_video_btn = gr.Button("To Control Video", size ="sm", visible = any_control_video )
                             video_info_to_video_source_btn = gr.Button("To Video Source", size ="sm", visible = any_video_source)
                             video_info_eject_video_btn = gr.Button("Eject Video", size ="sm")
-                    with gr.Tab("Post Processing", id= "post_processing") as video_postprocessing_tab:
+                        with gr.Row(**default_visibility) as image_buttons_row:
+                            video_info_to_start_image_btn = gr.Button("To Start Image", size ="sm", visible = any_start_image )
+                            video_info_to_end_image_btn = gr.Button("To End Image", size ="sm", visible = any_end_image)
+                            video_info_to_reference_image_btn = gr.Button("To Reference Image", size ="sm", visible = any_reference_image)
+                            video_info_eject_image_btn = gr.Button("Eject Image", size ="sm")
+                    with gr.Tab("Post Processing", id= "post_processing", visible = True) as video_postprocessing_tab:
                         with gr.Group(elem_classes= "postprocess"):
                             with gr.Column():
                                 PP_temporal_upsampling, PP_spatial_upsampling = gen_upsampling_dropdowns("",  "", element_class ="postprocess")
@@ -6990,10 +7036,10 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 PP_repeat_generation = gr.Slider(1, 25.0, value=1, step=1, label="Number of Sample Videos to Generate") 
 
                         video_info_postprocessing_btn = gr.Button("Apply Postprocessing", size ="sm", visible=True)
-                    with gr.Tab("Add Videos", id= "video_add"):
+                    with gr.Tab("Add Videos / Images", id= "video_add"):
                         files_to_load = gr.Files(label= "Files to Load in Gallery", height=120)
                         with gr.Row():
-                            video_info_add_videos_btn = gr.Button("Add Videos", size ="sm")
+                            video_info_add_videos_btn = gr.Button("Add Videos / Images", size ="sm")
  
             if not update_form:
 
@@ -7046,6 +7092,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                       video_prompt_type_video_guide, video_prompt_type_video_mask, video_prompt_type_image_refs, apg_col, audio_prompt_type_sources, audio_prompt_type_remux_row,
                                       video_guide_outpainting_col,video_guide_outpainting_top, video_guide_outpainting_bottom, video_guide_outpainting_left, video_guide_outpainting_right,
                                       video_guide_outpainting_checkbox, video_guide_outpainting_row, show_advanced, video_info_to_control_video_btn, video_info_to_video_source_btn, sample_solver_row,
+                                      video_buttons_row, image_buttons_row, video_postprocessing_tab, video_info_to_start_image_btn, video_info_to_end_image_btn, video_info_to_reference_image_btn,
                                       NAG_col] #  presets_column,
         if update_form:
             locals_dict = locals()
@@ -7072,7 +7119,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             show_advanced.change(fn=switch_advanced, inputs=[state, show_advanced, lset_name], outputs=[advanced_row, preset_buttons_rows, refresh_lora_btn, refresh2_row ,lset_name]).then(
                 fn=switch_prompt_type, inputs = [state, wizard_prompt_activated_var, wizard_variables_var, prompt, wizard_prompt, *prompt_vars], outputs = [wizard_prompt_activated_var, wizard_variables_var, prompt, wizard_prompt, prompt_column_advanced, prompt_column_wizard, prompt_column_wizard_vars, *prompt_vars])
             queue_df.select( fn=handle_celll_selection, inputs=state, outputs=[queue_df, modal_image_display, modal_container])
-            output.select(select_video, [state, output], outputs=[last_choice, video_info, video_buttons_row, video_postprocessing_tab] )
+            output.select(select_video, [state, output], outputs=[last_choice, video_info, video_buttons_row, image_buttons_row, video_postprocessing_tab] )
             preview_trigger.change(refresh_preview, inputs= [state], outputs= [preview])
 
             def refresh_status_async(state, progress=gr.Progress()):
@@ -7128,9 +7175,12 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             ).then( fn=use_video_settings, inputs =[state, output, last_choice] , outputs= [model_choice, refresh_form_trigger])
 
             video_info_add_videos_btn.click(fn=add_videos_to_gallery, inputs =[state, output, last_choice, files_to_load], outputs = [output, files_to_load, video_info_tabs] )
-            video_info_eject_video_btn.click(fn=eject_video_from_gallery, inputs =[state, output, last_choice], outputs = [output, video_info, video_buttons_row] )
+            gr.on(triggers=[video_info_eject_video_btn.click, video_info_eject_image_btn.click], fn=eject_video_from_gallery, inputs =[state, output, last_choice], outputs = [output, video_info, video_buttons_row] )
             video_info_to_control_video_btn.click(fn=video_to_control_video, inputs =[state, output, last_choice], outputs = [video_guide] )
             video_info_to_video_source_btn.click(fn=video_to_source_video, inputs =[state, output, last_choice], outputs = [video_source] )
+            video_info_to_start_image_btn.click(fn=image_to_ref_image, inputs =[state, output, last_choice, image_start, gr.State("Start Image")], outputs = [image_start] )
+            video_info_to_end_image_btn.click(fn=image_to_ref_image, inputs =[state, output, last_choice, image_end, gr.State("End Image")], outputs = [image_end] )
+            video_info_to_reference_image_btn.click(fn=image_to_ref_image, inputs =[state, output, last_choice, image_refs, gr.State("Ref Image")],  outputs = [image_refs] )
             video_info_postprocessing_btn.click(fn=apply_post_processing, inputs =[state, output, last_choice, PP_temporal_upsampling, PP_spatial_upsampling, PP_MMAudio_setting, PP_MMAudio_prompt, PP_MMAudio_neg_prompt, PP_MMAudio_seed, PP_repeat_generation], outputs = [mode, generate_trigger, add_to_queue_trigger ] )
             save_lset_btn.click(validate_save_lset, inputs=[state, lset_name], outputs=[apply_lset_btn, refresh_lora_btn, delete_lset_btn, save_lset_btn,confirm_save_lset_btn, cancel_lset_btn, save_lset_prompt_drop])
             delete_lset_btn.click(validate_delete_lset, inputs=[state, lset_name], outputs=[apply_lset_btn, refresh_lora_btn, delete_lset_btn, save_lset_btn,confirm_delete_lset_btn, cancel_lset_btn ])
@@ -7681,7 +7731,7 @@ def generate_info_tab():
 
 
 def  get_sorted_dropdown(dropdown_types):
-    families_order = {"wan":0, "ltxv":1, "hunyuan":2 }
+    families_order = {"wan":0, "ltxv":1, "hunyuan":2, "flux": 3 }
     dropdown_classes = [  families_order[get_model_family(type)] for type in dropdown_types]
     dropdown_names = [ get_model_name(type) for type in dropdown_types]
 

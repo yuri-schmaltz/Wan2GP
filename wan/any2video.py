@@ -106,18 +106,18 @@ class WanAny2V:
         #     config = json.load(f)
         # from mmgp import safetensors2
         # sd = safetensors2.torch_load_file(xmodel_filename)
-
+        # model_filename = "c:/temp/fflf/diffusion_pytorch_model-00001-of-00007.safetensors"
         base_config_file = f"configs/{base_model_type}.json"
-        forcedConfigPath = base_config_file if len(model_filename) > 1 or base_model_type in ["flf2v_720p"]  else None
+        forcedConfigPath = base_config_file if len(model_filename) > 1 else None
+        # forcedConfigPath = base_config_file = f"configs/flf2v_720p.json"
         # model_filename[1] = xmodel_filename
         self.model = offload.fast_load_transformers_model(model_filename, modelClass=WanModel,do_quantize= quantizeTransformer and not save_quantized, writable_tensors= False, defaultConfigPath=base_config_file , forcedConfigPath= forcedConfigPath)
         # self.model = offload.load_model_data(self.model, xmodel_filename )
         # offload.load_model_data(self.model, "c:/temp/Phantom-Wan-1.3B.pth")
-        # self.model.to(torch.bfloat16)
-        # self.model.cpu()
         self.model.lock_layers_dtypes(torch.float32 if mixed_precision_transformer else dtype)
         offload.change_dtype(self.model, dtype, True)
-        # offload.save_model(self.model, "multitalkbf16.safetensors", config_file_path=base_config_file, filter_sd=sd)
+        # offload.save_model(self.model, "flf2v_720p.safetensors", config_file_path=base_config_file)
+        # offload.save_model(self.model, "flf2v_quanto_int8_fp16_720p.safetensors", do_quantize= True, config_file_path=base_config_file)
         # offload.save_model(self.model, "multitalk_quanto_fp16.safetensors", do_quantize= True, config_file_path=base_config_file, filter_sd=sd)
 
         # offload.save_model(self.model, "wan2.1_selforcing_fp16.safetensors", config_file_path=base_config_file)
@@ -126,7 +126,7 @@ class WanAny2V:
         self.model.eval().requires_grad_(False)
         if save_quantized:
             from wgp import save_quantized_model
-            save_quantized_model(self.model, model_type, model_filename[1 if base_model_type=="fantasy" else 0], dtype, base_config_file)
+            save_quantized_model(self.model, model_type, model_filename[0], dtype, base_config_file)
 
         self.sample_neg_prompt = config.sample_neg_prompt
 
@@ -477,8 +477,8 @@ class WanAny2V:
             any_end_frame = False
             if input_frames != None:
                 _ , preframes_count, height, width = input_frames.shape
-                lat_h, lat_w = height // self.vae_stride[1], width // self.vae_stride[2]
-                clip_context = self.clip.visual([input_frames[:, -1:]]) #.to(self.param_dtype)
+                lat_h, lat_w = height // self.vae_stride[1], width // self.vae_stride[2]                                    
+                clip_context = self.clip.visual([input_frames[:, -1:]]) if model_type != "flf2v_720p" else self.clip.visual([input_frames[:, -1:], input_frames[:, -1:]])
                 input_frames = input_frames.to(device=self.device).to(dtype= self.VAE_dtype)
                 enc =  torch.concat( [input_frames, torch.zeros( (3, frame_num-preframes_count, height, width), 
                                      device=self.device, dtype= self.VAE_dtype)], 
@@ -488,7 +488,7 @@ class WanAny2V:
                 preframes_count = 1
                 image_start = TF.to_tensor(image_start)
                 any_end_frame = image_end != None 
-                add_frames_for_end_image = any_end_frame and model_type not in ["fun_inp_1.3B", "fun_inp", "i2v_720p"]
+                add_frames_for_end_image = any_end_frame and model_type == "i2v"
                 if any_end_frame:
                     image_end = TF.to_tensor(image_end) 
                     if add_frames_for_end_image:
@@ -517,8 +517,8 @@ class WanAny2V:
                     img_interpolated2 = resize_lanczos(image_end, h, w).sub_(0.5).div_(0.5).unsqueeze(0).transpose(0,1).to(self.device) #, self.dtype
                     image_end = resize_lanczos(image_end, clip_image_size, clip_image_size)
                     image_end = image_end.sub_(0.5).div_(0.5).to(self.device) #, self.dtype
-                if image_end != None and model_type == "flf2v_720p":
-                    clip_context = self.clip.visual([image_start[:, None, :, :], image_end[:, None, :, :]])
+                if model_type == "flf2v_720p":                    
+                    clip_context = self.clip.visual([image_start[:, None, :, :], image_end[:, None, :, :] if image_end != None else image_start[:, None, :, :]])
                 else:
                     clip_context = self.clip.visual([image_start[:, None, :, :]])
 
@@ -753,7 +753,7 @@ class WanAny2V:
                     "context" : [context, context_null, context_null],
                     "audio_scale": [audio_scale, None, None ]
                 }
-            elif multitalk:
+            elif multitalk and audio_proj != None:
                 gen_args = {
                     "x" : [latent_model_input, latent_model_input, latent_model_input],
                     "context" : [context, context_null, context_null],

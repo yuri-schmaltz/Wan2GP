@@ -184,6 +184,7 @@ def get_full_audio_embeddings(audio_guide1 = None, audio_guide2 = None, combinat
 
 
 def get_window_audio_embeddings(full_audio_embs, audio_start_idx=0, clip_length = 81, vae_scale = 4, audio_window = 5):
+    if full_audio_embs == None: return None
     HUMAN_NUMBER = len(full_audio_embs)
     audio_end_idx = audio_start_idx + clip_length
     indices = (torch.arange(2 * 2 + 1) - 2) * 1 
