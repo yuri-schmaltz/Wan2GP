@@ -65,7 +65,7 @@ class model_factory:
             fit_into_canvas = None,
             callback = None,
             loras_slists = None,
-            frame_num = 1,
+            batch_size = 1,
             **bbargs
     ):
             
@@ -89,7 +89,7 @@ class model_factory:
                 img_cond=image_ref,
                 target_width=width,
                 target_height=height,
-                bs=frame_num,
+                bs=batch_size,
                 seed=seed,
                 device="cuda",
             )
