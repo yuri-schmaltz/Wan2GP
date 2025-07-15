@@ -683,7 +683,7 @@ class WanAny2V:
         # init denoising
         updated_num_steps= len(timesteps)
         if callback != None:
-            from wgp import update_loras_slists
+            from wan.utils.utils import update_loras_slists
             update_loras_slists(self.model, loras_slists, updated_num_steps)
             callback(-1, None, True, override_num_inference_steps = updated_num_steps)
 

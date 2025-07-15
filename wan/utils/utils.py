@@ -33,7 +33,13 @@ def seed_everything(seed: int):
         torch.cuda.manual_seed(seed)
     if torch.backends.mps.is_available():
         torch.mps.manual_seed(seed)
-        
+
+def update_loras_slists(trans, slists, num_inference_steps ):
+    from mmgp import offload
+    slists = [ expand_slist(slist, num_inference_steps ) if isinstance(slist, list) else slist for slist in slists ]
+    nos = [str(l) for l in range(len(slists))]
+    offload.activate_loras(trans, nos, slists ) 
+
 def resample(video_fps, video_frames_count, max_target_frames_count, target_fps, start_target_frame ):
     import math
 

@@ -2107,8 +2107,9 @@ for file_path in models_def_paths:
     settings = json_def   
     existing_model_def = models_def.get(model_type, None) 
     if existing_model_def is not None:
-        existing_settings = models_def["settings"]
-        existing_settings.update(settings)
+        existing_settings = models_def.get("settings", None)
+        if existing_settings != None:
+            existing_settings.update(settings)
         existing_model_def.update(model_def)
     else:
         models_def[model_type] = model_def
