@@ -2132,8 +2132,8 @@ for model_type in model_types:
 transformer_types = server_config.get("transformer_types", [])
 new_transformer_types = []
 for model_type in transformer_types:
-    if get_model_def(model_type)  == None:
-        print(f"Model '{model_type}' is missing. Either install it in the finetune folder or remove this model in wgp_config.json")
+    if get_model_def(model_type) == None:
+        print(f"Model '{model_type}' is missing. Either install it in the finetune folder or remove this model from ley 'transformer_types' in wgp_config.json")
     else:
         new_transformer_types.append(model_type)
 transformer_types = new_transformer_types
