@@ -34,6 +34,15 @@ def seed_everything(seed: int):
     if torch.backends.mps.is_available():
         torch.mps.manual_seed(seed)
 
+def expand_slist(slist, num_inference_steps ):
+    new_slist= []
+    inc =  len(slist) / num_inference_steps 
+    pos = 0
+    for i in range(num_inference_steps):
+        new_slist.append(slist[ int(pos)])
+        pos += inc
+    return new_slist
+
 def update_loras_slists(trans, slists, num_inference_steps ):
     from mmgp import offload
     slists = [ expand_slist(slist, num_inference_steps ) if isinstance(slist, list) else slist for slist in slists ]
