@@ -30,8 +30,8 @@ def get_noise(
         2 * math.ceil(height / 16),
         2 * math.ceil(width / 16),
         dtype=dtype,
-        generator=torch.Generator(device="cuda").manual_seed(seed),
-    ).to(device)
+        generator=torch.Generator(device=device).manual_seed(seed),
+    )
 
 
 def prepare(t5: HFEmbedder, clip: HFEmbedder, img: Tensor, prompt: str | list[str]) -> dict[str, Tensor]:

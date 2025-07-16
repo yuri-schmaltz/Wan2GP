@@ -72,10 +72,7 @@ class model_factory:
             if self._interrupt:
                 return None
 
-            rng = torch.Generator(device="cuda")
-            if seed is None:
-                seed = rng.seed()
-
+            device="cuda"
             if input_ref_images != None and len(input_ref_images) > 0: 
                 image_ref = input_ref_images[0]
                 w, h = image_ref.size
@@ -91,7 +88,7 @@ class model_factory:
                 target_height=height,
                 bs=batch_size,
                 seed=seed,
-                device="cuda",
+                device=device,
             )
 
             inp.pop("img_cond_orig")
@@ -103,7 +100,7 @@ class model_factory:
             if x==None: return None
             # decode latents to pixel space
             x = unpack_latent(x)
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            with torch.autocast(device_type=device, dtype=torch.bfloat16):
                 x = self.vae.decode(x)
 
             x = x.clamp(-1, 1)
