@@ -4738,11 +4738,15 @@ def generate_video(
                     if metadata_choice == "json":
                         with open(path.replace(f'.{extension}', '.json'), 'w') as f:
                             json.dump(configs, f, indent=4)
-                    elif metadata_choice == "metadata" and not is_image:
-                        from mutagen.mp4 import MP4
-                        file = MP4(path)
-                        file.tags['©cmt'] = [json.dumps(configs)]
-                        file.save()
+                    elif metadata_choice == "metadata":
+                        if is_image:
+                            with Image.open(path) as img:
+                                img.save(path, comment=json.dumps(configs))
+                        else:
+                            from mutagen.mp4 import MP4
+                            file = MP4(path)
+                            file.tags['©cmt'] = [json.dumps(configs)]
+                            file.save()
                     if is_image:
                         print(f"New image saved to Path: "+ path)
                     else:
@@ -7621,7 +7625,7 @@ def generate_configuration_tab(state, blocks, header, model_choice, prompt_enhan
                 metadata_choice = gr.Dropdown(
                     choices=[
                         ("Export JSON files", "json"),
-                        ("Add metadata to video", "metadata"),
+                        ("Embed metadata (Exif tag)", "metadata"),
                         ("Neither", "none")
                     ],
                     value=server_config.get("metadata_type", "metadata"),
