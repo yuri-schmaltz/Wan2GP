@@ -10,13 +10,14 @@ from PIL import Image
 
 import cv2
 import torch
+import torch.nn.functional as F
 import numpy as np
 import gradio as gr
 from .tools.painter import mask_painter
 from .tools.interact_tools import SamControler
 from .tools.misc import get_device
 from .tools.download_util import load_file_from_url
-
+from segment_anything.modeling.image_encoder import window_partition, window_unpartition, get_rel_pos, Block as image_encoder_block
 from .utils.get_default_model import get_matanyone_model
 from .matanyone.inference.inference_core import InferenceCore
 from .matanyone_wrapper import matanyone
@@ -83,8 +84,11 @@ def get_frames_from_image(image_input, image_state):
         "fps": None
         }
     image_info = "Image Name: N/A,\nFPS: N/A,\nTotal Frames: {},\nImage Size:{}".format(len(frames), image_size)
+    set_image_encoder_patch()
+    torch.cuda.empty_cache()
     model.samcontroler.sam_controler.reset_image() 
     model.samcontroler.sam_controler.set_image(image_state["origin_images"][0])
+    torch.cuda.empty_cache()
     return image_state, image_info, image_state["origin_images"][0], \
                         gr.update(visible=True, maximum=10, value=10), gr.update(visible=False, maximum=len(frames), value=len(frames)), \
                         gr.update(visible=True), gr.update(visible=True), \
@@ -163,8 +167,11 @@ def get_frames_from_video(video_input, video_state):
         "audio": audio_path
         }
     video_info = "Video Name: {},\nFPS: {},\nTotal Frames: {},\nImage Size:{}".format(video_state["video_name"], round(video_state["fps"], 0), len(frames), image_size)
+    set_image_encoder_patch()
+    torch.cuda.empty_cache()    
     model.samcontroler.sam_controler.reset_image() 
     model.samcontroler.sam_controler.set_image(video_state["origin_images"][0])
+    torch.cuda.empty_cache()    
     return video_state, video_info, video_state["origin_images"][0], \
                         gr.update(visible=True, maximum=len(frames), value=1), gr.update(visible=True, maximum=len(frames), value=len(frames)), gr.update(visible=False, maximum=len(frames), value=len(frames)), \
                         gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), \
@@ -203,6 +210,70 @@ def get_end_number(track_pause_number_slider, video_state, interactive_state):
 
     return video_state["painted_images"][track_pause_number_slider],interactive_state
 
+
+def patched_forward(self, x: torch.Tensor) -> torch.Tensor:        
+    def split_mlp(mlp, x, divide = 4):
+        x_shape = x.shape
+        x = x.view(-1, x.shape[-1])
+        chunk_size = int(x.shape[0]/divide)
+        x_chunks = torch.split(x, chunk_size)
+        for i, x_chunk  in enumerate(x_chunks):
+            mlp_chunk = mlp.lin1(x_chunk)
+            mlp_chunk = mlp.act(mlp_chunk)
+            x_chunk[...] = mlp.lin2(mlp_chunk)
+        return x.reshape(x_shape)     
+
+    def get_decomposed_rel_pos( q, rel_pos_h, rel_pos_w, q_size, k_size) -> torch.Tensor:
+        q_h, q_w = q_size
+        k_h, k_w = k_size
+        Rh = get_rel_pos(q_h, k_h, rel_pos_h)
+        Rw = get_rel_pos(q_w, k_w, rel_pos_w)
+        B, _, dim = q.shape
+        r_q = q.reshape(B, q_h, q_w, dim)
+        rel_h = torch.einsum("bhwc,hkc->bhwk", r_q, Rh)
+        rel_w = torch.einsum("bhwc,wkc->bhwk", r_q, Rw)
+        attn = torch.zeros(B, q_h, q_w, k_h, k_w, dtype=q.dtype, device=q.device)
+        attn += rel_h[:, :, :, :, None]
+        attn += rel_w[:, :, :, None, :]
+        return attn.view(B, q_h * q_w, k_h * k_w)
+
+    def pay_attention(self, x: torch.Tensor) -> torch.Tensor:
+            B, H, W, _ = x.shape
+            # qkv with shape (3, B, nHead, H * W, C)
+            qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
+            # q, k, v with shape (B * nHead, H * W, C)
+            q, k, v = qkv.reshape(3, B * self.num_heads, H * W, -1).unbind(0)
+            attn_mask = None
+            if self.use_rel_pos:
+                attn_mask = get_decomposed_rel_pos(q, self.rel_pos_h, self.rel_pos_w, (H, W), (H, W))
+            x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, scale=self.scale)
+            del q, k, v, attn_mask
+            x = x.view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)
+            return self.proj(x)
+
+    shortcut = x
+    x = self.norm1(x)
+    # Window partition
+    if self.window_size > 0:
+        H, W = x.shape[1], x.shape[2]
+        x, pad_hw = window_partition(x, self.window_size)
+
+    x = pay_attention(self.attn,x)
+    # Reverse window partition
+    if self.window_size > 0:
+        x = window_unpartition(x, self.window_size, pad_hw, (H, W))
+    x += shortcut
+    shortcut[...] = self.norm2(x)
+    # x += self.mlp(shortcut)
+    x +=  split_mlp(self.mlp, shortcut)
+
+    return x
+
+def set_image_encoder_patch():
+    if not hasattr(image_encoder_block, "patched"):
+        image_encoder_block.forward = patched_forward
+        image_encoder_block.patched = True
+
 # use sam to get the mask
 def sam_refine(video_state, point_prompt, click_state, interactive_state, evt:gr.SelectData ): #
     """
@@ -217,8 +288,10 @@ def sam_refine(video_state, point_prompt, click_state, interactive_state, evt:gr
     else:
         coordinate = "[[{},{},0]]".format(evt.index[0], evt.index[1])
         interactive_state["negative_click_times"] += 1
-    
+
+    torch.cuda.empty_cache()    
     # prompt for sam model
+    set_image_encoder_patch()
     model.samcontroler.sam_controler.reset_image()
     model.samcontroler.sam_controler.set_image(video_state["origin_images"][video_state["select_frame_number"]])
     prompt = get_prompt(click_state=click_state, click_input=coordinate)
@@ -233,6 +306,7 @@ def sam_refine(video_state, point_prompt, click_state, interactive_state, evt:gr
     video_state["logits"][video_state["select_frame_number"]] = logit
     video_state["painted_images"][video_state["select_frame_number"]] = painted_image
 
+    torch.cuda.empty_cache()
     return painted_image, video_state, interactive_state
 
 def add_multi_mask(video_state, interactive_state, mask_dropdown):
@@ -313,7 +387,9 @@ def image_matting(video_state, interactive_state, mask_dropdown, erode_kernel_si
     # operation error
     if len(np.unique(template_mask))==1:
         template_mask[0][0]=1
+    torch.cuda.empty_cache()    
     foreground, alpha = matanyone(matanyone_processor, following_frames, template_mask*255, r_erode=erode_kernel_size, r_dilate=dilate_kernel_size, n_warmup=refine_iter)
+    torch.cuda.empty_cache()    
 
 
     foreground_mat = False
@@ -376,7 +452,9 @@ def video_matting(video_state, end_slider, matting_type, interactive_state, mask
     # operation error
     if len(np.unique(template_mask))==1:
         template_mask[0][0]=1
+    torch.cuda.empty_cache()    
     foreground, alpha = matanyone(matanyone_processor, following_frames, template_mask*255, r_erode=erode_kernel_size, r_dilate=dilate_kernel_size)
+    torch.cuda.empty_cache()    
     output_frames = []
     foreground_mat = matting_type == "Foreground"
     if not foreground_mat:

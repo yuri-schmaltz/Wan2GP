@@ -99,7 +99,7 @@ def get_video_info(video_path):
     cap = cv2.VideoCapture(video_path)
     
     # Get FPS
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = round(cap.get(cv2.CAP_PROP_FPS))
     
     # Get resolution
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))

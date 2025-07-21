@@ -23,6 +23,7 @@ class model_factory:
         checkpoint_dir,
         model_filename = None,
         model_type = None, 
+        model_def = None,
         base_model_type = None,
         text_encoder_filename = None,
         quantizeTransformer = False,
@@ -35,15 +36,20 @@ class model_factory:
         self.VAE_dtype = VAE_dtype
         self.dtype = dtype
         torch_device = "cpu"
-
+        # model_filename = ["c:/temp/flux1-schnell.safetensors"] 
+        
         self.t5 = load_t5(torch_device, text_encoder_filename, max_length=512)
         self.clip = load_clip(torch_device)
-        self.name= "flux-dev-kontext"
+        self.name = model_def.get("flux-model", "flux-dev")
+        # self.name= "flux-dev-kontext"
+        # self.name= "flux-dev"
+        # self.name= "flux-schnell"
         self.model = load_flow_model(self.name, model_filename[0], torch_device)
 
         self.vae = load_ae(self.name, device=torch_device)
 
         # offload.change_dtype(self.model, dtype, True)
+        # offload.save_model(self.model, "flux-dev.safetensors")
         if save_quantized:
             from wgp import save_quantized_model
             save_quantized_model(self.model, model_type, model_filename[0], dtype, None)
@@ -61,7 +67,7 @@ class model_factory:
             input_ref_images = None,
             width= 832,
             height=480,
-            guide_scale: float = 2.5,
+            embedded_guidance_scale: float = 2.5,
             fit_into_canvas = None,
             callback = None,
             loras_slists = None,
@@ -77,6 +83,8 @@ class model_factory:
                 image_ref = input_ref_images[0]
                 w, h = image_ref.size
                 height, width = calculate_new_dimensions(height, width, h, w, fit_into_canvas)
+            else:
+                image_ref = None
 
             inp, height, width = prepare_kontext(
                 t5=self.t5,
@@ -96,7 +104,7 @@ class model_factory:
             def unpack_latent(x):
                 return unpack(x.float(), height, width) 
             # denoise initial noise
-            x = denoise(self.model, **inp, timesteps=timesteps, guidance=guide_scale, callback=callback, pipeline=self, loras_slists= loras_slists, unpack_latent = unpack_latent)
+            x = denoise(self.model, **inp, timesteps=timesteps, guidance=embedded_guidance_scale, callback=callback, pipeline=self, loras_slists= loras_slists, unpack_latent = unpack_latent)
             if x==None: return None
             # decode latents to pixel space
             x = unpack_latent(x)
@@ -107,3 +115,13 @@ class model_factory:
             x = x.transpose(0, 1)
             return x
 
+def query_model_def(model_type, model_def):
+    flux_model = model_def.get("flux-model", "flux-dev")
+    flux_schnell = flux_model == "flux-schnell" 
+    model_def_output = {
+        "image_outputs" : True,
+    }
+    if flux_schnell:
+        model_def_output["no_guidance"] = True
+
+    return model_def_output
