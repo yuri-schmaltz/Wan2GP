@@ -51,7 +51,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.5.1"
-WanGP_version = "7.1"
+WanGP_version = "7.11"
 settings_version = 2.22
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -2143,8 +2143,9 @@ for file_path in models_def_paths:
             existing_settings.update(settings)
         existing_model_def.update(model_def)
     else:
-        models_def[model_type] = model_def
-        models_def[model_type] = init_model_def(model_type, model_def)
+        models_def[model_type] = model_def # partial def
+        model_def= init_model_def(model_type, model_def)
+        models_def[model_type] = model_def # replace with full def
         model_def["settings"] = settings
 
 model_types = models_def.keys()
@@ -6794,7 +6795,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ("No Control Video", ""),
                                 ("Transfer Human Motion", "PV"),
                                 ("Transfer Depth", "DV"),
-                                ("Transfer Canny Edges (broken ?)", "EV"),
+                                ("Transfer Canny Edges", "EV"),
                                 ("Use LTXV raw format", "V"),
                            ],
                             value=filter_letters(video_prompt_type_value, "PDEV"),

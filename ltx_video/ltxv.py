@@ -482,7 +482,7 @@ class LTXV:
         map = {
             "P" : "pose",
             "D" : "depth",
-            "S" : "canny",
+            "E" : "canny",
         }
         loras = []
         preloadURLs = get_model_recursive_prop(self.model_type,  "preload_URLs")
