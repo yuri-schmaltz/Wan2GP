@@ -4459,7 +4459,7 @@ def generate_video(
                     raise gr.Error(f"invalid keep frames {keep_frames_video_guide}")
                 keep_frames_parsed = keep_frames_parsed[guide_start_frame: guide_end_frame ]
             if ltxv and video_guide != None:
-                preprocess_type = process_map_video_guide.get(filter_letters(video_prompt_type, "PES"), "raw")
+                preprocess_type = process_map_video_guide.get(filter_letters(video_prompt_type, "PED"), "raw")
                 status_info = "Extracting " + processes_names[preprocess_type]
                 send_cmd("progress", [0, get_latest_status(state, status_info)])
                 # start one frame ealier to faciliate latents merging later
