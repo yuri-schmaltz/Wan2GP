@@ -2074,8 +2074,8 @@ def get_default_settings(model_type):
             })
             
 
-        ui_defaults_update = model_def["settings"] 
-        ui_defaults.update(ui_defaults_update)
+        ui_defaults_update = model_def.get("settings", None) 
+        if ui_defaults_update is not None: ui_defaults.update(ui_defaults_update)
 
         if len(ui_defaults.get("prompt","")) == 0:
             ui_defaults["prompt"]= get_default_prompt(i2v)
