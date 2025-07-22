@@ -608,11 +608,11 @@ def query_model_def(model_type, model_def):
     LTXV_config = model_def.get("LTXV_config", "")
     distilled= "distilled" in LTXV_config 
     model_def_output = {
-		"lock_inference_steps": True,
 		"no_guidance": True,		
     }
     if distilled:
         model_def_output.update({
+		"lock_inference_steps": True,
         "no_negative_prompt" : True,
     })
         

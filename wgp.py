@@ -51,7 +51,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.5.1"
-WanGP_version = "7.11"
+WanGP_version = "7.12"
 settings_version = 2.22
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -275,6 +275,10 @@ def process_prompt_and_add_tasks(state, model_choice):
     skip_steps_cache_type= inputs["skip_steps_cache_type"]
     MMAudio_setting = inputs["MMAudio_setting"]
 
+
+    if not model_def.get("lock_inference_steps", False) and model_type in ["ltxv_13B"] and num_inference_steps < 20:
+        gr.Info("The minimum number of steps should be 20") 
+        return
     if skip_steps_cache_type == "mag":
         if model_type in  ["sky_df_1.3B", "sky_df_14B"]:
             gr.Info("Mag Cache is not supported with Diffusion Forcing")
