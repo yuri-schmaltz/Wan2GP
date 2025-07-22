@@ -3124,7 +3124,7 @@ def select_video(state, input_file_list, event_data: gr.EventData):
     if data!=None and isinstance(data, dict):
         choice = data.get("index",0)
     else:
-        choice = 0 if len(file_list) > 0 else -1
+        choice = min(len(file_list)-1, gen.get("selected",0)) if len(file_list) > 0 else -1
     set_file_choice(gen, file_list, choice)
     
 
@@ -7051,7 +7051,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 ], visible= True, label= "Sampler Solver / Scheduler"
                             )
 
-                        with gr.Row(visible = vace):
+                        with gr.Row(visible = vace) as control_net_weights_row:
                             control_net_weight = gr.Slider(0.0, 2.0, value=ui_defaults.get("control_net_weight",1), step=0.1, label="Control Net Weight #1", visible=vace)
                             control_net_weight2 = gr.Slider(0.0, 2.0, value=ui_defaults.get("control_net_weight2",1), step=0.1, label="Control Net Weight #2", visible=vace)
                         negative_prompt = gr.Textbox(label="Negative Prompt (ignored if no Guidance that is if CFG = 1)", value=ui_defaults.get("negative_prompt", ""), visible = not (hunyuan_t2v or hunyuan_i2v or flux or no_negative_prompt)  )
@@ -7422,7 +7422,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                       video_guide_outpainting_col,video_guide_outpainting_top, video_guide_outpainting_bottom, video_guide_outpainting_left, video_guide_outpainting_right,
                                       video_guide_outpainting_checkbox, video_guide_outpainting_row, show_advanced, video_info_to_control_video_btn, video_info_to_video_source_btn, sample_solver_row,
                                       video_buttons_row, image_buttons_row, video_postprocessing_tab, video_info_to_start_image_btn, video_info_to_end_image_btn, video_info_to_reference_image_btn, video_info_to_image_guide_btn, video_info_to_image_mask_btn,
-                                      NAG_col, speakers_locations_row, guidance_row, resolution_group, cfg_free_guidance_col] #  presets_column,
+                                      NAG_col, speakers_locations_row, guidance_row, resolution_group, cfg_free_guidance_col, control_net_weights_row] #  presets_column,
         if update_form:
             locals_dict = locals()
             gen_inputs = [state_dict if k=="state" else locals_dict[k]  for k in inputs_names] + [state_dict] + extra_inputs
