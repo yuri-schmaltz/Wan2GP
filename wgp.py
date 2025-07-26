@@ -290,6 +290,9 @@ def process_prompt_and_add_tasks(state, model_choice):
         if num_inference_steps > 50:
             gr.Info("Mag Cache maximum number of steps is 50")
             return
+        
+    if image_mode == 1:
+        audio_prompt_type = ""
 
     if "B" in audio_prompt_type or "X" in audio_prompt_type:
         from wan.multitalk.multitalk import parse_speakers_locations
@@ -7031,7 +7034,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                     label="Automatic Removal of Background of People or Objects (Only)", scale = 3, visible= "I" in video_prompt_type_value and not hunyuan_video_avatar and not flux
                 )
 
-            any_audio_voices_support = any_audio_track(base_model_type)
+            any_audio_voices_support = any_audio_track(base_model_type) 
             audio_prompt_type_value = ui_defaults.get("audio_prompt_type", "A" if any_audio_voices_support else "") 
             audio_prompt_type = gr.Text(value= audio_prompt_type_value, visible= False)
             if any_audio_voices_support:
@@ -7044,15 +7047,15 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         ("Two speakers, Speakers Audio sources are assumed to be played in Parallel", "PAB"),
                     ],
                     value= filter_letters(audio_prompt_type_value, "XCPAB"),
-                    label="Voices", scale = 3, visible = multitalk 
+                    label="Voices", scale = 3, visible = multitalk and not image_outputs
                 )
             else:
                 audio_prompt_type_sources = gr.Dropdown( choices= [""], value = "", visible=False)
 
-            with gr.Row(visible = any_audio_voices_support) as audio_guide_row:
+            with gr.Row(visible = any_audio_voices_support and not image_outputs) as audio_guide_row:
                 audio_guide = gr.Audio(value= ui_defaults.get("audio_guide", None), type="filepath", label="Voice to follow", show_download_button= True, visible= any_audio_voices_support and "A" in audio_prompt_type_value )
                 audio_guide2 = gr.Audio(value= ui_defaults.get("audio_guide2", None), type="filepath", label="Voice to follow #2", show_download_button= True, visible= any_audio_voices_support and "B" in audio_prompt_type_value )
-            with gr.Row(visible = any_audio_voices_support and ("B" in audio_prompt_type_value or "X" in audio_prompt_type_value) ) as speakers_locations_row:
+            with gr.Row(visible = any_audio_voices_support and ("B" in audio_prompt_type_value or "X" in audio_prompt_type_value) and not image_outputs ) as speakers_locations_row:
                 speakers_locations = gr.Text( ui_defaults.get("speakers_locations", "0:45 55:100"), label="Speakers Locations separated by a Space. Each Location = Left:Right or a BBox Left:Top:Right:Bottom", visible= True)
 
             advanced_prompt = advanced_ui
