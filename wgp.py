@@ -2128,7 +2128,8 @@ def get_model_query_handler(model_type):
         from ltx_video.ltxv import query_model_def
     elif model_family == "flux":
         from flux.flux_main import query_model_def
-    
+    else:
+        raise Exception(f"Unknown / unsupported model type {model_type}")   
     return query_model_def
 
 def init_model_def(model_type, model_def):
@@ -6031,14 +6032,15 @@ def use_video_settings(state, input_file_list, choice):
             defaults.update(configs)
             current_model_type = state["model_type"]
             prompt = configs.get("prompt", "")
-            set_model_settings(state, model_type, defaults)
             if has_image_file_extension(file_name):
                 gr.Info(f"Settings Loaded from Image with prompt '{prompt[:100]}'")
             else:
                 gr.Info(f"Settings Loaded from Video with prompt '{prompt[:100]}'")
             if are_model_types_compatible(model_type,current_model_type):
+                set_model_settings(state, current_model_type, defaults)
                 return gr.update(), str(time.time())
             else:
+                set_model_settings(state, model_type, defaults)
                 return generate_dropdown_model_list(model_type), gr.update()
     else:
         gr.Info(f"No Video is Selected")
