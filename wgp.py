@@ -6026,21 +6026,23 @@ def use_video_settings(state, input_file_list, choice):
         if configs == None:
             gr.Info("No Settings to Extract")
         else:
+            current_model_type = state["model_type"]
             model_type = configs["model_type"] 
+            models_compatible = are_model_types_compatible(model_type,current_model_type) 
+            if models_compatible:
+                model_type = current_model_type
             defaults = get_model_settings(state, model_type) 
             defaults = get_default_settings(model_type) if defaults == None else defaults
             defaults.update(configs)
-            current_model_type = state["model_type"]
             prompt = configs.get("prompt", "")
+            set_model_settings(state, model_type, defaults)
             if has_image_file_extension(file_name):
                 gr.Info(f"Settings Loaded from Image with prompt '{prompt[:100]}'")
             else:
                 gr.Info(f"Settings Loaded from Video with prompt '{prompt[:100]}'")
-            if are_model_types_compatible(model_type,current_model_type):
-                set_model_settings(state, current_model_type, defaults)
+            if models_compatible:
                 return gr.update(), str(time.time())
             else:
-                set_model_settings(state, model_type, defaults)
                 return generate_dropdown_model_list(model_type), gr.update()
     else:
         gr.Info(f"No Video is Selected")
@@ -8770,5 +8772,5 @@ if __name__ == "__main__":
         else:
             url = "http://" + server_name 
         webbrowser.open(url + ":" + str(server_port), new = 0, autoraise = True)
-    demo.launch(server_name=server_name, server_port=server_port, share=args.share, allowed_paths=[save_path])
-# Lucky me !!!
+    demo.launch(favicon_path="favicon.png",  server_name=server_name, server_port=server_port, share=args.share, allowed_paths=[save_path])
+
