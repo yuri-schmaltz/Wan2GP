@@ -51,7 +51,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.5.1"
-WanGP_version = "7.2"
+WanGP_version = "7.3"
 settings_version = 2.22
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -1691,6 +1691,8 @@ for path in  ["wan2.1_Vace_1.3B_preview_bf16.safetensors", "sky_reels2_diffusion
         print(f"Removing old version of model '{path}'. A new version of this model will be downloaded next time you use it.")
         os.remove( os.path.join("ckpts" , path))
 
+families_infos = {"wan":(0, "Wan2.1"), "ltxv":(1, "LTX Video"), "hunyuan":(2, "Hunyuan Video"), "flux":(3, "Flux 1"), "unknown": (100, "Unknown") }
+
 models_def = {}
 
 modules_files = {
@@ -2858,7 +2860,7 @@ def apply_changes(  state,
     if args.lock_config:
         return
     if gen_in_progress:
-        return "<DIV ALIGN=CENTER>Unable to change config when a generation is in progress</DIV>",*[gr.update()]*5
+        return "<DIV ALIGN=CENTER>Unable to change config when a generation is in progress</DIV>",*[gr.update()]*6
     global offloadobj, wan_model, server_config, loras, loras_names, default_loras_choices, default_loras_multis_str, default_lora_preset_prompt, default_lora_preset, loras_presets
     server_config = {
         "attention_mode" : attention_choice,  
@@ -2887,8 +2889,10 @@ def apply_changes(  state,
         "max_frames_multiplier" : max_frames_multiplier_choice,
         "display_stats" : display_stats_choice,
         "last_model_type" : state["model_type"],
+        "last_model_per_family":  state["last_model_per_family"],
         "last_advanced_choice": state["advanced"], 
         "last_resolution_choice": last_resolution_choice, 
+        "last_resolution_per_group":  state["last_resolution_per_group"],
     }
 
     if Path(server_config_filename).is_file():
@@ -2928,11 +2932,11 @@ def apply_changes(  state,
         model_choice = gr.Dropdown()
     else:
         reload_needed = True
-        model_choice = generate_dropdown_model_list(transformer_type)
+        model_family, model_choice = generate_dropdown_model_list(transformer_type)
 
     header = generate_header(state["model_type"], compile=compile, attention_mode= attention_mode)
     mmaudio_enabled = server_config["mmaudio_enabled"] > 0
-    return "<DIV ALIGN=CENTER>The new configuration has been succesfully applied</DIV>", header, model_choice, gr.Row(visible= server_config["enhancer_enabled"] == 1),  gr.Row(visible= mmaudio_enabled), gr.Column(visible= mmaudio_enabled)
+    return "<DIV ALIGN=CENTER>The new configuration has been succesfully applied</DIV>", header, model_family, model_choice, gr.Row(visible= server_config["enhancer_enabled"] == 1),  gr.Row(visible= mmaudio_enabled), gr.Column(visible= mmaudio_enabled)
 
 
 
@@ -3230,7 +3234,7 @@ def select_video(state, input_file_list, event_data: gr.EventData):
             values +=[video_creation_date]
             labels +=["Creation Date"]
         else: 
-            video_prompt =  configs.get("prompt", "")[:512]
+            video_prompt =  configs.get("prompt", "")[:1024]
             video_video_prompt_type = configs.get("video_prompt_type", "")
             video_image_prompt_type = configs.get("image_prompt_type", "")
             video_audio_prompt_type = configs.get("audio_prompt_type", "")
@@ -3246,6 +3250,7 @@ def select_video(state, input_file_list, event_data: gr.EventData):
                                  + [ v for s,v in map_video_prompt.items() if check(video_video_prompt_type,s)] \
                                  + [ v for s,v in map_audio_prompt.items() if all_letters(video_audio_prompt_type,s)] 
             video_model_type =  configs.get("model_type", "t2v")
+            model_family = get_model_family(video_model_type)
             video_other_prompts = ", ".join(video_other_prompts)
             video_resolution = configs.get("resolution", "") + f" (real: {width}x{height})"
             video_length = configs.get("video_length", 0)
@@ -3263,7 +3268,7 @@ def select_video(state, input_file_list, event_data: gr.EventData):
                 video_length_summary += f"{frames_count/fps:.1f}s, {round(fps)} fps)"
             video_guidance_scale = configs.get("guidance_scale", None)
             video_embedded_guidance_scale = configs.get("embedded_guidance_scale ", None)
-            if get_model_family(video_model_type) in ["hunyuan", "flux"]:
+            if model_family in ["hunyuan", "flux"]:
                 video_guidance_scale = video_embedded_guidance_scale
                 video_guidance_label = "Embedded Guidance Scale"
             else:
@@ -3292,7 +3297,11 @@ def select_video(state, input_file_list, event_data: gr.EventData):
                 labels += ["Other Prompts"]
             if len(video_outpainting) >0 and any_letters(video_image_prompt_type, "VFK"):
                 values += [video_outpainting]
-                labels += ["Outpainting"]        
+                labels += ["Outpainting"]
+            video_sample_solver = configs.get("sample_solver", "")
+            if model_family == "wan":
+                values += ["unipc" if len(video_sample_solver) ==0 else video_sample_solver]
+                labels += ["Sampler Solver"]                                        
             values += [video_resolution, video_length_summary, video_seed, video_guidance_scale, video_flow_shift, video_num_inference_steps]
             labels += [ "Resolution", video_length_label, "Seed", video_guidance_label, "Flow Shift", "Num Inference steps"]
             video_negative_prompt = configs.get("negative_prompt", "")
@@ -5572,7 +5581,7 @@ def apply_lset(state, wizard_prompt_activated, lset_name, loras_choices, loras_m
     lset_name = get_lset_name(state, lset_name)
     if len(lset_name) == 0:
         gr.Info("Please choose a Lora Preset or Setting File in the list or create one")
-        return wizard_prompt_activated, loras_choices, loras_mult_choices, prompt, gr.update(), gr.update(), gr.update()
+        return wizard_prompt_activated, loras_choices, loras_mult_choices, prompt, gr.update(), gr.update(), gr.update(), gr.update()
     else:
         current_model_type = state["model_type"]
         if lset_name.endswith(".lset"):
@@ -5592,7 +5601,7 @@ def apply_lset(state, wizard_prompt_activated, lset_name, loras_choices, loras_m
                 state["apply_success"] = 1
                 wizard_prompt_activated = "on"
 
-            return wizard_prompt_activated, loras_choices, loras_mult_choices, prompt, get_unique_id(), gr.update(), gr.update()
+            return wizard_prompt_activated, loras_choices, loras_mult_choices, prompt, get_unique_id(), gr.update(), gr.update(), gr.update()
         else:
             configs, _ = get_settings_from_file(state, os.path.join(get_lora_dir(current_model_type), lset_name), True, True, True)
             if configs == None:
@@ -5605,10 +5614,10 @@ def apply_lset(state, wizard_prompt_activated, lset_name, loras_choices, loras_m
 
             if model_type == current_model_type:
                 set_model_settings(state, current_model_type, configs)        
-                return *[gr.update()] * 4, gr.update(), gr.update(), get_unique_id()
+                return *[gr.update()] * 4, gr.update(), gr.update(), gr.update(), get_unique_id()
             else:
                 set_model_settings(state, model_type, configs)        
-                return *[gr.update()] * 4, gr.update(), generate_dropdown_model_list(model_type), gr.update()
+                return *[gr.update()] * 4, gr.update(), *generate_dropdown_model_list(model_type), gr.update()
 
 def extract_prompt_from_wizard(state, variables_names, prompt, wizard_prompt, allow_null_values, *args):
 
@@ -6044,9 +6053,9 @@ def use_video_settings(state, input_file_list, choice):
             else:
                 gr.Info(f"Settings Loaded from Video with prompt '{prompt[:100]}'")
             if models_compatible:
-                return gr.update(), str(time.time())
+                return gr.update(), gr.update(), str(time.time())
             else:
-                return generate_dropdown_model_list(model_type), gr.update()
+                return *generate_dropdown_model_list(model_type), gr.update()
     else:
         gr.Info(f"No Video is Selected")
 
@@ -6144,10 +6153,10 @@ def load_settings_from_file(state, file_path):
 
     if model_type == current_model_type:
         set_model_settings(state, current_model_type, configs)        
-        return gr.update(), str(time.time()), None
+        return gr.update(), gr.update(), str(time.time()), None
     else:
         set_model_settings(state, model_type, configs)        
-        return generate_dropdown_model_list(model_type), gr.update(), None
+        return *generate_dropdown_model_list(model_type), gr.update(), None
 
 def save_inputs(
             target,
@@ -6324,7 +6333,11 @@ def change_model(state, model_choice):
         return
     model_filename = get_model_filename(model_choice, transformer_quantization, transformer_dtype_policy)
     state["model_filename"] = model_filename
+    last_model_per_family = state["last_model_per_family"] 
+    last_model_per_family[get_model_family(model_choice)] = model_choice
+    server_config["last_model_per_family"] = last_model_per_family
     server_config["last_model_type"] = model_choice
+
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config, indent=4))
 
@@ -6613,21 +6626,31 @@ def group_resolutions(resolutions, selected_resolution):
     available_groups.reverse()
     return available_groups, selected_group_resolutions, selected_group
 
-def change_resolution_group(selected_group):
+def change_resolution_group(state, selected_group):
     resolution_choices = get_resolution_choices(None)    
     group_resolution_choices = [ resolution for resolution in resolution_choices if categorize_resolution(resolution[1]) == selected_group ]
-    return gr.update(choices= group_resolution_choices, value= group_resolution_choices[0][1] ) 
+
+    last_resolution_per_group = state["last_resolution_per_group"]
+    last_resolution = last_resolution_per_group.get(selected_group, "")
+    if len(last_resolution) == 0 or not any( [last_resolution == resolution[1] for resolution in group_resolution_choices]):
+        last_resolution = group_resolution_choices[0][1]
+    return gr.update(choices= group_resolution_choices, value= last_resolution ) 
+    
 
 
-def record_last_resolution(resolution):
+def record_last_resolution(state, resolution):
     server_config["last_resolution_choice"] = resolution
+    selected_group = categorize_resolution(resolution)
+    last_resolution_per_group = state["last_resolution_per_group"]
+    last_resolution_per_group[selected_group ] = resolution
+    server_config["last_resolution_per_group"] = last_resolution_per_group
     with open(server_config_filename, "w", encoding="utf-8") as writer:
         writer.write(json.dumps(server_config, indent=4))
 
 def get_max_frames(nb):
     return (nb - 1) * server_config.get("max_frames_multiplier",1) + 1
 
-def generate_video_tab(update_form = False, state_dict = None, ui_defaults = None, model_choice = None, header = None, main = None):
+def generate_video_tab(update_form = False, state_dict = None, ui_defaults = None, model_family = None, model_choice = None, header = None, main = None):
     global inputs_names #, advanced
 
     if update_form:
@@ -6643,6 +6666,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
         state_dict["model_filename"] = model_filename
         state_dict["model_type"] = model_type
         state_dict["advanced"] = advanced_ui
+        state_dict["last_model_per_family"] = server_config.get("last_model_per_family", {})
+        state_dict["last_resolution_per_group"] = server_config.get("last_resolution_per_group", {})
         gen = dict()
         gen["queue"] = []
         state_dict["gen"] = gen
@@ -7562,8 +7587,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             target_settings = gr.Text(value = "settings", interactive= False, visible= False)
             last_choice = gr.Number(value =-1, interactive= False, visible= False)
 
-            resolution_group.input(fn=change_resolution_group, inputs=[resolution_group], outputs=[resolution])
-            resolution.change(fn=record_last_resolution, inputs=[resolution])
+            resolution_group.input(fn=change_resolution_group, inputs=[state, resolution_group], outputs=[resolution])
+            resolution.change(fn=record_last_resolution, inputs=[state, resolution])
 
             
             audio_prompt_type_remux.change(fn=refresh_audio_prompt_type_remux, inputs=[state, audio_prompt_type, audio_prompt_type_remux], outputs=[audio_prompt_type])
@@ -7635,7 +7660,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             ).then(fn=save_inputs,
                 inputs =[target_state] + gen_inputs,
                 outputs= None
-            ).then( fn=use_video_settings, inputs =[state, output, last_choice] , outputs= [model_choice, refresh_form_trigger])
+            ).then( fn=use_video_settings, inputs =[state, output, last_choice] , outputs= [model_family, model_choice, refresh_form_trigger])
 
             video_info_add_videos_btn.click(fn=add_videos_to_gallery, inputs =[state, output, last_choice, files_to_load], outputs = [output, files_to_load, video_info_tabs] )
             gr.on(triggers=[video_info_eject_video_btn.click, video_info_eject_video2_btn.click, video_info_eject_image_btn.click], fn=eject_video_from_gallery, inputs =[state, output, last_choice], outputs = [output, video_info, video_buttons_row] )
@@ -7657,7 +7682,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             confirm_delete_lset_btn.click(delete_lset, inputs=[state, lset_name], outputs=[lset_name, apply_lset_btn, refresh_lora_btn, delete_lset_btn, save_lset_btn,confirm_delete_lset_btn, cancel_lset_btn ])
             cancel_lset_btn.click(cancel_lset, inputs=[], outputs=[apply_lset_btn, refresh_lora_btn, delete_lset_btn, save_lset_btn, confirm_delete_lset_btn,confirm_save_lset_btn, cancel_lset_btn,save_lset_prompt_drop ])
             apply_lset_btn.click(fn=save_inputs, inputs =[target_state] + gen_inputs, outputs= None).then(fn=apply_lset, 
-                inputs=[state, wizard_prompt_activated_var, lset_name,loras_choices, loras_multipliers, prompt], outputs=[wizard_prompt_activated_var, loras_choices, loras_multipliers, prompt, fill_wizard_prompt_trigger, model_choice, refresh_form_trigger])
+                inputs=[state, wizard_prompt_activated_var, lset_name,loras_choices, loras_multipliers, prompt], outputs=[wizard_prompt_activated_var, loras_choices, loras_multipliers, prompt, fill_wizard_prompt_trigger, model_family, model_choice, refresh_form_trigger])
             refresh_lora_btn.click(refresh_lora_list, inputs=[state, lset_name,loras_choices], outputs=[lset_name, loras_choices])
             refresh_lora_btn2.click(refresh_lora_list, inputs=[state, lset_name,loras_choices], outputs=[lset_name, loras_choices])
 
@@ -7693,7 +7718,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             ).then(fn=save_inputs,
                 inputs =[target_state] + gen_inputs,
                 outputs= None
-            ).then(fn=load_settings_from_file, inputs =[state, settings_file] , outputs= [model_choice, refresh_form_trigger, settings_file])
+            ).then(fn=load_settings_from_file, inputs =[state, settings_file] , outputs= [model_family, model_choice, refresh_form_trigger, settings_file])
 
 
             fill_wizard_prompt_trigger.change(
@@ -7708,6 +7733,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                 inputs= [state, wizard_prompt_activated_var, wizard_variables_var,  prompt, wizard_prompt, *prompt_vars],
                 outputs= [prompt]
             )                
+
+            model_family.input(fn=change_model_family, inputs=[state, model_family], outputs= [model_choice])
 
             model_choice.change(fn=validate_wizard_prompt,
                 inputs= [state, wizard_prompt_activated_var, wizard_variables_var,  prompt, wizard_prompt, *prompt_vars] ,
@@ -7896,13 +7923,13 @@ def generate_download_tab(lset_name,loras_choices, state):
     download_loras_btn.click(fn=download_loras, inputs=[], outputs=[download_status_row, download_status]).then(fn=refresh_lora_list, inputs=[state, lset_name,loras_choices], outputs=[lset_name, loras_choices])
 
     
-def generate_configuration_tab(state, blocks, header, model_choice, resolution, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col):
+def generate_configuration_tab(state, blocks, header, model_family, model_choice, resolution, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col):
     gr.Markdown("Please click Apply Changes at the bottom so that the changes are effective. Some choices below may be locked if the app has been launched by specifying a config preset.")
     with gr.Column():
         with gr.Tabs():
             # with gr.Row(visible=advanced_ui) as advanced_row:
             with gr.Tab("General"):
-                dropdown_choices = get_sorted_dropdown(displayed_model_types)
+                dropdown_families, dropdown_choices = get_sorted_dropdown(displayed_model_types, None)
 
                 transformer_types_choices = gr.Dropdown(
                     choices= dropdown_choices,
@@ -8185,7 +8212,7 @@ def generate_configuration_tab(state, blocks, header, model_choice, resolution, 
                     display_stats_choice,
                     resolution,
                 ],
-                outputs= [msg , header, model_choice, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col]
+                outputs= [msg , header, model_family, model_choice, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col]
         )
 
 def generate_about_tab():
@@ -8232,29 +8259,62 @@ def generate_info_tab():
         with gr.Tab("Vace", id="vace"):
             gr.Markdown(vace)
 
+def compact_name(family_name, model_name):
+    if model_name.startswith(family_name):
+        return model_name[len(family_name):].strip()
+    return model_name
 
-def  get_sorted_dropdown(dropdown_types):
-    families_order = {"wan":0, "ltxv":1, "hunyuan":2, "flux": 3, "unknown": 100 }
-    dropdown_classes = [  families_order[get_model_family(type)] for type in dropdown_types]
-    dropdown_names = [ get_model_name(type) for type in dropdown_types]
+def get_sorted_dropdown(dropdown_types, current_model_family):
+    models_families = [get_model_family(type) for type in dropdown_types] 
+    families = {}
+    for family in models_families:
+        if family not in families: families[family] = 1
 
-    dropdown_choices = [model[1:] for model in sorted(zip(dropdown_classes, dropdown_names , dropdown_types), key=lambda c: (c[0], c[1]))]
-    return dropdown_choices
+    families_orders = [  families_infos[family][0]  for family in families ]
+    families_labels = [  families_infos[family][1]  for family in families ]
+    sorted_familes = [ info[1:] for info in sorted(zip(families_orders, families_labels, families), key=lambda c: c[0])]
+    if current_model_family is None:
+        dropdown_choices = [ (families_infos[family][0], get_model_name(model_type), model_type) for model_type, family in zip(dropdown_types, models_families)]
+    else:
+        dropdown_choices = [ (families_infos[family][0], compact_name(families_infos[family][1], get_model_name(model_type)), model_type) for model_type, family in zip( dropdown_types, models_families) if family == current_model_family]
+    dropdown_choices = sorted(dropdown_choices, key=lambda c: (c[0], c[1]))
+    dropdown_choices = [model[1:] for model in dropdown_choices] 
+    return sorted_familes, dropdown_choices
 
 def generate_dropdown_model_list(current_model_type):
     dropdown_types= transformer_types if len(transformer_types) > 0 else displayed_model_types 
     if current_model_type not in dropdown_types:
         dropdown_types.append(current_model_type)
-    dropdown_choices = get_sorted_dropdown(dropdown_types)
+    current_model_family = get_model_family(current_model_type)
+    sorted_familes, dropdown_choices = get_sorted_dropdown(dropdown_types, current_model_family)
 
-    return gr.Dropdown(
+    dropdown_families = gr.Dropdown(
+        choices= sorted_familes,
+        value= current_model_family,
+        show_label= False,
+        scale= 1,
+        elem_id="family_list",
+        min_width=50
+        )
+
+    return dropdown_families, gr.Dropdown(
         choices= dropdown_choices,
         value= current_model_type,
         show_label= False,
-        scale= 2,
+        scale= 4,
         elem_id="model_list",
-        elem_classes="model_list_class",
         )
+
+def change_model_family(state, current_model_family):
+    dropdown_types= transformer_types if len(transformer_types) > 0 else displayed_model_types 
+    current_family_name = families_infos[current_model_family][1]
+    models_families = [get_model_family(type) for type in dropdown_types] 
+    dropdown_choices = [ (compact_name(current_family_name,  get_model_name(model_type)), model_type) for model_type, family in zip(dropdown_types, models_families) if family == current_model_family ]
+    dropdown_choices = sorted(dropdown_choices, key=lambda c: c[0])
+    last_model_per_family = state.get("last_model_per_family", {})
+    model_type = last_model_per_family.get(current_model_family, "")
+    if len(model_type) == "" or model_type not in displayed_model_types:  model_type = dropdown_choices[0][1]
+    return gr.Dropdown(choices= dropdown_choices, value = model_type )
 
 def set_new_tab(tab_state, new_tab_no):
     global vmc_event_handler    
@@ -8399,12 +8459,20 @@ def create_ui():
             --layout-gap: 0px !important;
         }    
         .postprocess span {margin-top:4px;margin-bottom:4px} 
-        #model_list{
+        #model_list, #family_list{
         background-color:black;
         padding:1px}
 
-        #model_list input {
+        #model_list input, #family_list input {
         font-size:25px}
+
+        #family_list div div {
+        border-radius: 4px 0px 0px 4px;
+        }
+
+        #model_list div div {
+        border-radius: 0px 4px 4px 0px;
+        }
 
         .title-with-lines {
             display: flex;
@@ -8722,10 +8790,11 @@ def create_ui():
                 with gr.Row():
                     if args.lock_model:    
                         gr.Markdown("<div class='title-with-lines'><div class=line></div><h2>" + get_model_name(transformer_type) + "</h2><div class=line></div>")
-                        model_choice = gr.Dropdown(visible=False, value= transformer_type)
+                        model_family = gr.Dropdown(visible=False, value= "")
+                        model_choice = gr.Dropdown(visible=False, value= transformer_type, choices= [transformer_type])
                     else:
                         gr.Markdown("<div class='title-with-lines'><div class=line width=100%></div></div>")
-                        model_choice = generate_dropdown_model_list(transformer_type)
+                        model_family, model_choice = generate_dropdown_model_list(transformer_type)
                         gr.Markdown("<div class='title-with-lines'><div class=line width=100%></div></div>")
                 with gr.Row():
                     header = gr.Markdown(generate_header(transformer_type, compile, attention_mode), visible= True)
@@ -8735,16 +8804,16 @@ def create_ui():
                 with gr.Row():
                     (   state, loras_choices, lset_name, resolution,
                         video_guide, image_guide, video_mask, image_mask, image_refs, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col
-                    ) = generate_video_tab(model_choice=model_choice, header=header, main = main)
+                    ) = generate_video_tab(model_family=model_family, model_choice=model_choice, header=header, main = main)
             with gr.Tab("Guides", id="info") as info_tab:
                 generate_info_tab()
             with gr.Tab("Video Mask Creator", id="video_mask_creator") as video_mask_creator:
-                matanyone_app.display(main_tabs, tab_state, model_choice, video_guide, image_guide, video_mask, image_mask, image_refs)
+                matanyone_app.display(main_tabs, tab_state, video_guide, image_guide, video_mask, image_mask, image_refs)
             if not args.lock_config:
                 with gr.Tab("Downloads", id="downloads") as downloads_tab:
                     generate_download_tab(lset_name, loras_choices, state)
                 with gr.Tab("Configuration", id="configuration") as configuration_tab:
-                    generate_configuration_tab(state, main, header, model_choice, resolution, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col)
+                    generate_configuration_tab(state, main, header, model_family, model_choice, resolution, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col)
             with gr.Tab("About"):
                 generate_about_tab()
         if stats_app is not None:
