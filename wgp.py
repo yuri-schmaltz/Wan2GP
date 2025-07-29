@@ -2761,14 +2761,17 @@ def load_models(model_type):
         preload = server_config.get("preload_in_VRAM", 0)
     model_file_list = [model_filename]
     model_type_list = [model_type]
+    model_submodel_no_list = [1]
     if model_filename2 != None:
         model_file_list += [model_filename2]
         model_type_list += [model_type]
+        model_submodel_no_list += [2]
     for module_type in modules:
         model_file_list.append(get_model_filename(module_type, transformer_quantization, transformer_dtype, is_module= True))
         model_type_list.append(module_type)
-    for filename, file_model_type in zip(model_file_list, model_type_list): 
-        download_models(filename, file_model_type)
+        model_submodel_no_list.append(0) 
+    for filename, file_model_type, submodel_no in zip(model_file_list, model_type_list, model_submodel_no_list): 
+        download_models(filename, file_model_type, submodel_no)
     VAE_dtype = torch.float16 if server_config.get("vae_precision","16") == "16" else torch.float
     mixed_precision_transformer =  server_config.get("mixed_precision","0") == "1"
     transformer_type = None
