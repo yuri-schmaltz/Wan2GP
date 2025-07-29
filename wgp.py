@@ -51,7 +51,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.5.1"
-WanGP_version = "7.3"
+WanGP_version = "7.4"
 settings_version = 2.23
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -2797,13 +2797,14 @@ def load_models(model_type):
         budgets = { "transformer" : 100 if preload  == 0 else preload, "text_encoder" : 100 if preload  == 0 else preload, "*" : max(1000 if profile==5 else 3000 , preload) }
         if "transformer2" in pipe:
             budgets["transformer2"] = 100 if preload  == 0 else preload
-            loras_transformer += ["transformer2"]
         kwargs["budgets"] = budgets
     elif profile == 3:
         kwargs["budgets"] = { "*" : "70%" }
 
-    if "transformer2" in pipe and profile in [2,4]:
-        kwargs["pinnedMemory"] = ["transformer", "transformer2"]
+    if "transformer2" in pipe:
+        loras_transformer += ["transformer2"]        
+        if profile in [2,4]:
+            kwargs["pinnedMemory"] = ["transformer", "transformer2"]
 
 
     global prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer
@@ -7087,8 +7088,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         video_prompt_type_image_refs = gr.Dropdown(
                             choices=[
                                 ("None", ""),
-                                ("Inject only People / Objects", "I"),
-                                ("Inject Main Subject / Landscape and then People / Objects", "KI"),
+                                ("Conditional Images are People / Objects", "I"),
+                                ("Conditional Images is first Main Subject / Landscape and may be followed by People / Objects", "KI"),
                                 ],
                             value=filter_letters(video_prompt_type_value, "KFI"),
                             visible = True,
@@ -7136,7 +7137,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                 remove_background_images_ref = gr.Dropdown(
                     choices=[
                         ("Keep Backgrounds behind all Reference Images", 0),
-                        ("Remove Backgrounds only behind People / Objects", 1),
+                        ("Remove Backgrounds only behind People / Objects except main Subject" if flux else "Remove Backgrounds only behind People / Objects" , 1),
                     ],
                     value=ui_defaults.get("remove_background_images_ref",1),
                     label="Automatic Removal of Background of People or Objects (Only)", scale = 3, visible= "I" in video_prompt_type_value and not hunyuan_video_avatar
