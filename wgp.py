@@ -2775,10 +2775,10 @@ def load_models(model_type):
     VAE_dtype = torch.float16 if server_config.get("vae_precision","16") == "16" else torch.float
     mixed_precision_transformer =  server_config.get("mixed_precision","0") == "1"
     transformer_type = None
-    for i, filename in enumerate(model_file_list):
-        if i==0:  
+    for submodel_no, filename in zip(model_submodel_no_list, model_file_list):
+        if submodel_no>=1:  
             print(f"Loading Model '{filename}' ...")
-        elif "_lora" not in filename:
+        else: 
             print(f"Loading Module '{filename}' ...")
 
     if model_family == "wan" :
