@@ -20,15 +20,13 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
 
 ## 🔥 Latest Updates
-### July 29 2025: WanGP v7.3 : Wan 2.2 Preview
-
 Wan 2.2 is here.  The good news is that WanGP wont require a single byte of extra VRAM to run it and it will be as fast as Wan 2.1. The bad news is that you will need much more RAM if you want to leverage entirely this new model since it has twice has many parameters.
 
 So here is a preview version of Wan 2.2 that is without the 5B model and Wan 2.2 image to video for the moment.
 
-However as I felt bad to deliver only half of the wares, I gave you instead ..... Wan 2.2 Vace Cocktail !
+However as I felt bad to deliver only half of the wares, I gave you instead .....** Wan 2.2 Vace Cocktail** !
 
-Very good surprise indeed, the loras and Vace mostly work with Wan 2.2 !!! I have made a light version of the cocktail that uses only half of the parameters of Wan 2.2, this version has exactly the same RAM requirements. Wan 2.1. Videos baked with half of the model are not so good but maybe they are better than Wan 2.1 . So you tell me if we should keep the light version.
+Very good surprise indeed, the loras and Vace mostly work with Wan 2.2 !!! I have made also a light version of the cocktail that uses only half of the parameters of Wan 2.2, this version has exactly the same RAM requirements as Wan 2.1. but Videos baked with half of the model are not so good. Maybe they are better than Wan 2.1 . So you tell me if we should keep the light version.
 
 Probably Multitalk should work too, but I have a life to attend to so I will let you test.
 
