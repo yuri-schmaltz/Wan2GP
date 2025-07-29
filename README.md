@@ -25,9 +25,9 @@ Wan 2.2 is here.  The good news is that WanGP wont require a single byte of extr
 
 So here is a preview version of Wan 2.2 that is without the 5B model and Wan 2.2 image to video for the moment.
 
-However as I felt bad to deliver only half of the wares, I gave you instead .....** Wan 2.2 Vace Cocktail** !
+However as I felt bad to deliver only half of the wares, I gave you instead .....** Wan 2.2 Vace Experimental Cocktail** !
 
-Very good surprise indeed, the loras and Vace partially work with Wan 2.2. We will need for the official Vace 2.2 release since some Vace features are broken like identity preservation
+Very good surprise indeed, the loras and Vace partially work with Wan 2.2. We will need to wait for the official Vace 2.2 release since some Vace features are broken like identity preservation
 
 Bonus zone: Flux multi images conditions has been added, or maybe not if I broke everything as I have been distracted by Wan...
 
