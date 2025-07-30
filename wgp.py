@@ -2631,10 +2631,8 @@ def load_wan_model(model_filename, model_type, base_model_type, model_def, quant
     )
 
     pipe = {"transformer": wan_model.model, "text_encoder" : wan_model.text_encoder.model, "vae": wan_model.vae.model }
-    if wan_model.model2 is not None:
+    if hasattr(wan_model,"model2") and wan_model.model2 is not None:
         pipe["transformer2"] = wan_model.model2
-        # del pipe["transformer"]
-        # pipe["transformer"] = wan_model.model
     if hasattr(wan_model, "clip"):
         pipe["text_encoder_2"] = wan_model.clip.model
     return wan_model, pipe
