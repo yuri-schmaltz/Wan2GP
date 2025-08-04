@@ -762,11 +762,11 @@ class WanModel(ModelMixin, ConfigMixin):
         offload.shared_state["_chipmunk_layers"] = None
 
     def preprocess_loras(self, model_type, sd):
-        new_sd = {}
-        for k,v in sd.items():
-            if not k.endswith(".modulation.diff"):
-                new_sd[ k] = v
-        sd = new_sd
+        # new_sd = {}
+        # for k,v in sd.items():
+        #     if not k.endswith(".modulation.diff"):
+        #         new_sd[ k] = v
+        # sd = new_sd
         first = next(iter(sd), None)
         if first == None:
             return sd

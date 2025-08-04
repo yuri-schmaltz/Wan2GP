@@ -50,8 +50,8 @@ global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
-target_mmgp_version = "3.5.5"
-WanGP_version = "7.6"
+target_mmgp_version = "3.5.6"
+WanGP_version = "7.61"
 settings_version = 2.23
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -297,7 +297,7 @@ def process_prompt_and_add_tasks(state, model_choice):
     activated_loras = inputs["activated_loras"]
 
     if len(loras_multipliers) > 0:
-        _, _, errors =  parse_loras_multipliers(loras_multipliers, len(activated_loras), num_inference_steps)
+        _, _, errors =  parse_loras_multipliers(loras_multipliers, len(activated_loras), num_inference_steps, max_phases= 2 if get_model_family(model_type)=="wan" and model_type not in ["sky_df_1.3B", "sky_df_14B"] else 1)
         if len(errors) > 0: 
             gr.Info(f"Error parsing Loras Multipliers: {errors}")
             return

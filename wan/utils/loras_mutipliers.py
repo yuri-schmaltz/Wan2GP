@@ -52,7 +52,7 @@ def parse_loras_multipliers(loras_multipliers, nb_loras, num_inference_steps, me
                 phase_mult = mult.split(";")
                 shared_phases = len(phase_mult) <=1
                 if len(phase_mult) > max_phases:
-                    return "", "", f"Loras can not be defined for more than {max_phases} Denoising phases for this model"
+                    return "", "", f"Loras can not be defined for more than {max_phases} Denoising phase{'s' if max_phases>1 else ''} for this model"
                 for phase_no, mult in enumerate(phase_mult):
                     if phase_no > 0: current_phase = phase2
                     if "," in mult:
