@@ -490,6 +490,8 @@ def extract_audio_tracks(source_video, verbose=False, query_only=False):
 
 import subprocess
 
+import subprocess
+
 def combine_and_concatenate_video_with_audio_tracks(
     save_path_tmp, video_path,
     source_audio_tracks, new_audio_tracks,
@@ -516,10 +518,10 @@ def combine_and_concatenate_video_with_audio_tracks(
         if source_audio_duration == 0:
             if n:
                 inputs += ['-i', n]
-                filters.append(f'[{idx}:a]apad=pad_dur=100[aout{i}];')
+                filters.append(f'[{idx}:a]apad=pad_dur=100[aout{i}]')
                 idx += 1
             else:
-                filters.append(f'anullsrc=r={audio_sampling_rate}:cl=mono,apad=pad_dur=100[aout{i}];')
+                filters.append(f'anullsrc=r={audio_sampling_rate}:cl=mono,apad=pad_dur=100[aout{i}]')
         else:
             if s:
                 inputs += ['-i', s]
@@ -533,32 +535,32 @@ def combine_and_concatenate_video_with_audio_tracks(
                 if needs_filter:
                     filters.append(
                         f'[{idx}:a]aresample={audio_sampling_rate},aformat=channel_layouts=mono,'
-                        f'apad=pad_dur={source_audio_duration},atrim=0:{source_audio_duration},asetpts=PTS-STARTPTS[s{i}];')
+                        f'apad=pad_dur={source_audio_duration},atrim=0:{source_audio_duration},asetpts=PTS-STARTPTS[s{i}]')
                 else:
                     filters.append(
-                        f'[{idx}:a]apad=pad_dur={source_audio_duration},atrim=0:{source_audio_duration},asetpts=PTS-STARTPTS[s{i}];')
+                        f'[{idx}:a]apad=pad_dur={source_audio_duration},atrim=0:{source_audio_duration},asetpts=PTS-STARTPTS[s{i}]')
                 if lang := meta.get('language'):
                     metadata_args += ['-metadata:s:a:' + str(i), f'language={lang}']
                 idx += 1
             else:
                 filters.append(
-                    f'anullsrc=r={audio_sampling_rate}:cl=mono,atrim=0:{source_audio_duration},asetpts=PTS-STARTPTS[s{i}];')
+                    f'anullsrc=r={audio_sampling_rate}:cl=mono,atrim=0:{source_audio_duration},asetpts=PTS-STARTPTS[s{i}]')
 
             if n:
                 inputs += ['-i', n]
                 start = '0' if new_audio_from_start else source_audio_duration
                 filters.append(
                     f'[{idx}:a]aresample={audio_sampling_rate},aformat=channel_layouts=mono,'
-                    f'atrim=start={start},asetpts=PTS-STARTPTS[n{i}];'
-                    f'[s{i}][n{i}]concat=n=2:v=0:a=1[aout{i}];')
+                    f'atrim=start={start},asetpts=PTS-STARTPTS[n{i}]')
+                filters.append(f'[s{i}][n{i}]concat=n=2:v=0:a=1[aout{i}]')
                 idx += 1
             else:
-                filters.append(f'[s{i}]apad=pad_dur=100[aout{i}];')
+                filters.append(f'[s{i}]apad=pad_dur=100[aout{i}]')
 
         maps += ['-map', f'[aout{i}]']
 
     cmd = ['ffmpeg', '-y', *inputs,
-           '-filter_complex', ''.join(filters),
+           '-filter_complex', ';'.join(filters),  # ✅ Only change made
            *maps, *metadata_args,
            '-c:v', 'copy',
            '-c:a', audio_codec,
@@ -567,7 +569,7 @@ def combine_and_concatenate_video_with_audio_tracks(
            '-ac', '1',
            '-shortest', save_path_tmp]
 
-    if verbose :
+    if verbose:
         print(f"ffmpeg command: {cmd}")
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
