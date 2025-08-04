@@ -4073,7 +4073,10 @@ def edit_video(
             os.remove(tmp_path)
 
         if any_change:
-            print(f"Postprocessed video saved to Path: "+ new_video_path)
+            if mode == "edit_remux":
+                print(f"Remuxed Video saved to Path: "+ new_video_path)
+            else:
+                print(f"Postprocessed video saved to Path: "+ new_video_path)
             with lock:
                 file_list.append(new_video_path)
                 file_settings_list.append(configs)
@@ -7584,7 +7587,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 label="Generate more frames to preserve Reference Image Identity"
                             )
 
-                with gr.Tab("Sliding Window", visible= sliding_window_enabled) as sliding_window_tab:
+                with gr.Tab("Sliding Window", visible= sliding_window_enabled and not image_outputs) as sliding_window_tab:
 
                     with gr.Column():  
                         gr.Markdown("<B>A Sliding Window allows you to generate video with a duration not limited by the Model</B>")
