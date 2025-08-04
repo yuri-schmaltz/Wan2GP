@@ -177,7 +177,7 @@ def process_prompt_and_add_tasks(state, model_choice):
         queue = gen.get("queue", [])
         return get_queue_table(queue)
     model_def = get_model_def(model_type)
-    image_outputs = model_def.get("image_outputs", False)
+    image_outputs = inputs["image_mode"] == 1
     no_steps_skipping = model_def.get("no_steps_skipping", False)
     model_type = get_base_model_type(model_type)
     inputs["model_filename"] = model_filename
@@ -7087,20 +7087,21 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             label="Video to Video", scale = 2, show_label= False, visible= True
                         )
                     elif vace :
+                        pose_label = "Pose" if image_outputs else "Motion" 
                         video_prompt_type_video_guide = gr.Dropdown(
                             choices=[
                                 ("No Control Image" if image_outputs else "No Control Video", ""),
                                 ("Keep Control Image Unchanged" if image_outputs else "Keep Control Video Unchanged", "UV"),
-                                ("Transfer Human Motion", "PV"),
+                                (f"Transfer Human {pose_label}" , "PV"),
                                 ("Transfer Depth", "DV"),
                                 ("Transfer Shapes", "SV"),
                                 ("Transfer Flow", "LV"),
                                 ("Recolorize", "CV"),
                                 ("Perform Inpainting", "MV"),
                                 ("Use Vace raw format", "V"),
-                                ("Transfer Human Motion & Depth", "PDV"),
-                                ("Transfer Human Motion & Shapes", "PSV"),
-                                ("Transfer Human Motion & Flow", "PLV"),
+                                (f"Transfer Human {pose_label} & Depth", "PDV"),
+                                (f"Transfer Human {pose_label} & Shapes", "PSV"),
+                                (f"Transfer Human {pose_label} & Flow", "PLV"),
                                 ("Transfer Depth & Shapes", "DSV"),
                                 ("Transfer Depth & Flow", "DLV"),
                                 ("Transfer Shapes & Flow", "SLV"),
