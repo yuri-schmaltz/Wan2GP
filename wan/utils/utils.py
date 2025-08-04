@@ -497,7 +497,8 @@ def combine_and_concatenate_video_with_audio_tracks(
     new_audio_from_start=False,
     source_audio_metadata=None,
     audio_bitrate='128k',
-    audio_codec='aac' 
+    audio_codec='aac',
+    verbose = False
 ):
     inputs, filters, maps, idx = ['-i', video_path], [], ['-map', '0:v'], 1
     metadata_args = []
@@ -566,6 +567,8 @@ def combine_and_concatenate_video_with_audio_tracks(
            '-ac', '1',
            '-shortest', save_path_tmp]
 
+    if verbose :
+        print(f"ffmpeg command: {cmd}")
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:

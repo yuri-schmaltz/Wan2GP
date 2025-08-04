@@ -4208,7 +4208,7 @@ def generate_video(
     model_def = get_model_def(model_type) 
     is_image = image_mode == 1
     if is_image:
-        video_length = min_frames_if_references if "I" in video_prompt_type else 1 
+        video_length = min_frames_if_references if "I" in video_prompt_type or "V" in video_prompt_type else 1 
     else:
         batch_size = 1
     temp_filenames_list = []
@@ -4981,7 +4981,7 @@ def generate_video(
                     else:
                         new_audio_tracks = control_audio_tracks
 
-                    combine_and_concatenate_video_with_audio_tracks(video_path, save_path_tmp,  source_audio_tracks, new_audio_tracks, source_audio_duration, audio_sampling_rate, new_audio_from_start = new_audio_from_start, source_audio_metadata= source_audio_metadata )
+                    combine_and_concatenate_video_with_audio_tracks(video_path, save_path_tmp,  source_audio_tracks, new_audio_tracks, source_audio_duration, audio_sampling_rate, new_audio_from_start = new_audio_from_start, source_audio_metadata= source_audio_metadata, verbose = verbose_level>=2 )
                     os.remove(save_path_tmp)
                     if output_new_audio_temp_filepath is not None: os.remove(output_new_audio_temp_filepath)
 
@@ -7585,7 +7585,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                                 value=ui_defaults.get("min_frames_if_references",5),
                                 visible=True,
                                 scale = 1,
-                                label="Generate more frames to preserve Reference Image Identity"
+                                label="Generate more frames to preserve Reference Image Identity or Control Image Information"
                             )
 
                 with gr.Tab("Sliding Window", visible= sliding_window_enabled and not image_outputs) as sliding_window_tab:
