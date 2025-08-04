@@ -21,7 +21,7 @@ from PIL import Image
 import numpy as np
 import torchvision.transforms as transforms
 import cv2
-from wan.utils.utils import resize_lanczos, calculate_new_dimensions
+from wan.utils.utils import calculate_new_dimensions, convert_tensor_to_image
 from hyvideo.data_kits.audio_preprocessor import encode_audio, get_facemask
 from transformers import WhisperModel
 from transformers import AutoFeatureExtractor
@@ -720,7 +720,6 @@ class HunyuanVideoSampler(Inference):
         embedded_guidance_scale=6.0,
         batch_size=1,
         num_videos_per_prompt=1,
-        i2v_resolution="720p",
         image_start=None,
         enable_RIFLEx = False,
         i2v_condition_type: str = "token_replace",
@@ -846,39 +845,13 @@ class HunyuanVideoSampler(Inference):
         denoise_strength = 0
         ip_cfg_scale = 0
         if i2v_mode:
-            if i2v_resolution == "720p":
-                bucket_hw_base_size = 960
-            elif i2v_resolution == "540p":
-                bucket_hw_base_size = 720
-            elif i2v_resolution == "360p":
-                bucket_hw_base_size = 480
-            else:
-                raise ValueError(f"i2v_resolution: {i2v_resolution} must be in [360p, 540p, 720p]")
-
-            # semantic_images = [Image.open(i2v_image_path).convert('RGB')]
-            semantic_images = [image_start.convert('RGB')] #
-            origin_size = semantic_images[0].size
-            h, w = origin_size
-            h, w = calculate_new_dimensions(height, width, h, w, fit_into_canvas)
-            closest_size = (w, h)
-            # crop_size_list = generate_crop_size_list(bucket_hw_base_size, 32)
-            # aspect_ratios = np.array([round(float(h)/float(w), 5) for h, w in crop_size_list])
-            # closest_size, closest_ratio = get_closest_ratio(origin_size[1], origin_size[0], aspect_ratios, crop_size_list)
-            ref_image_transform = transforms.Compose([
-                transforms.Resize(closest_size),
-                transforms.CenterCrop(closest_size),
-                transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5])
-            ])
-
-            semantic_image_pixel_values = [ref_image_transform(semantic_image) for semantic_image in semantic_images]
-            semantic_image_pixel_values = torch.cat(semantic_image_pixel_values).unsqueeze(0).unsqueeze(2).to(self.device)
-
+            semantic_images = convert_tensor_to_image(image_start)
+            semantic_image_pixel_values = image_start.unsqueeze(0).unsqueeze(2).to(self.device)
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
                 img_latents = self.pipeline.vae.encode(semantic_image_pixel_values).latent_dist.mode() # B, C, F, H, W
                 img_latents.mul_(self.pipeline.vae.config.scaling_factor)
 
-            target_height, target_width = closest_size
+            target_height, target_width = image_start.shape[1:] 
 
         # ========================================================================
         # Build Rope freqs

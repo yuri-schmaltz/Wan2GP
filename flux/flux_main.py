@@ -58,12 +58,18 @@ class model_factory:
         # self.name= "flux-dev-kontext"
         # self.name= "flux-dev"
         # self.name= "flux-schnell"
-        self.model = load_flow_model(self.name, model_filename[0], torch_device)
+        source =  model_def.get("source", None)
+        self.model = load_flow_model(self.name, model_filename[0] if source is None else source, torch_device)
 
         self.vae = load_ae(self.name, device=torch_device)
 
         # offload.change_dtype(self.model, dtype, True)
         # offload.save_model(self.model, "flux-dev.safetensors")
+
+        if not source is None:
+            from wgp import save_model
+            save_model(self.model, model_type, dtype, None)
+
         if save_quantized:
             from wgp import save_quantized_model
             save_quantized_model(self.model, model_type, model_filename[0], dtype, None)

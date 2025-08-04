@@ -26,13 +26,18 @@ def save_video(frames, save_path, fps, quality=9, ffmpeg_params=None):
     writer.close()
 
 
-def get_audio_features(wav2vec, audio_processor, audio_path, fps, num_frames):
+def get_audio_features(wav2vec, audio_processor, audio_path, fps, start_frame, num_frames):
     sr = 16000
-    audio_input, sample_rate = librosa.load(audio_path, sr=sr)  # 采样率为 16kHz
+    audio_input, sample_rate = librosa.load(audio_path, sr=sr)  # 采样率为 16kHz    start_time = 0
+    if start_frame  < 0:
+        pad = int(abs(start_frame)/ fps * sr)
+        audio_input = np.concatenate([np.zeros(pad), audio_input])
+        end_frame = num_frames
+    else:
+        end_frame = start_frame + num_frames
 
-    start_time = 0
-    # end_time = (0 + (num_frames - 1) * 1) / fps
-    end_time = num_frames / fps
+    start_time = start_frame / fps
+    end_time = end_frame / fps
 
     start_sample = int(start_time * sr)
     end_sample = int(end_time * sr)

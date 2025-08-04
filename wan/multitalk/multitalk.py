@@ -74,7 +74,7 @@ def audio_prepare_single(audio_path, sample_rate=16000, duration = 0):
         return human_speech_array
 
  
-def audio_prepare_multi(left_path, right_path, audio_type = "add", sample_rate=16000, duration = 0):
+def audio_prepare_multi(left_path, right_path, audio_type = "add", sample_rate=16000, duration = 0, pad = 0):
     if not (left_path==None or right_path==None):
         human_speech_array1 = audio_prepare_single(left_path, duration = duration)
         human_speech_array2 = audio_prepare_single(right_path, duration = duration)
@@ -91,7 +91,13 @@ def audio_prepare_multi(left_path, right_path, audio_type = "add", sample_rate=1
     elif audio_type=='add':
         new_human_speech1 = np.concatenate([human_speech_array1[: human_speech_array1.shape[0]], np.zeros(human_speech_array2.shape[0])]) 
         new_human_speech2 = np.concatenate([np.zeros(human_speech_array1.shape[0]), human_speech_array2[:human_speech_array2.shape[0]]])
+
+    #dont include the padding on the summed audio which is used to build the output audio track
     sum_human_speechs = new_human_speech1 + new_human_speech2
+    if pad  > 0:
+        new_human_speech1 = np.concatenate([np.zeros(pad), new_human_speech1])
+        new_human_speech2 = np.concatenate([np.zeros(pad), new_human_speech2])
+
     return new_human_speech1, new_human_speech2, sum_human_speechs
 
 def process_tts_single(text, save_dir, voice1):    
@@ -167,14 +173,13 @@ def process_tts_multi(text, save_dir, voice1, voice2):
     return s1, s2, save_path_sum
 
 
-def get_full_audio_embeddings(audio_guide1 = None, audio_guide2 = None, combination_type ="add", num_frames =  0, fps = 25, sr = 16000):
+def get_full_audio_embeddings(audio_guide1 = None, audio_guide2 = None, combination_type ="add", num_frames =  0, fps = 25, sr = 16000, padded_frames_for_embeddings = 0):
     wav2vec_feature_extractor, audio_encoder= custom_init('cpu', "ckpts/chinese-wav2vec2-base")
     # wav2vec_feature_extractor, audio_encoder= custom_init('cpu', "ckpts/wav2vec")
-
-    new_human_speech1, new_human_speech2, sum_human_speechs = audio_prepare_multi(audio_guide1, audio_guide2, combination_type, duration= num_frames / fps)
+    pad = int(padded_frames_for_embeddings/ fps * sr)
+    new_human_speech1, new_human_speech2, sum_human_speechs = audio_prepare_multi(audio_guide1, audio_guide2, combination_type, duration= num_frames / fps, pad = pad)
     audio_embedding_1 = get_embedding(new_human_speech1, wav2vec_feature_extractor, audio_encoder, sr=sr, fps= fps)
     audio_embedding_2 = get_embedding(new_human_speech2, wav2vec_feature_extractor, audio_encoder, sr=sr, fps= fps)
-
     full_audio_embs = []
     if audio_guide1 != None: full_audio_embs.append(audio_embedding_1)
     # if audio_guide1 != None: full_audio_embs.append(audio_embedding_1)

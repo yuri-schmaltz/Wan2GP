@@ -141,7 +141,8 @@ class WanAny2V:
         if save_quantized:
             from wgp import save_quantized_model
             save_quantized_model(self.model, model_type, model_filename[0], dtype, base_config_file)
-
+            if self.model2 is not None:
+                save_quantized_model(self.model2, model_type, model_filename[1], dtype, base_config_file, submodel_no=2)
         self.sample_neg_prompt = config.sample_neg_prompt
 
         if self.model.config.get("vace_in_dim", None) != None:
@@ -357,7 +358,7 @@ class WanAny2V:
         input_frames= None,
         input_masks = None,
         input_ref_images = None,      
-        input_video=None,
+        input_video = None,
         image_start = None,
         image_end = None,
         denoising_strength = 1.0,
@@ -395,6 +396,7 @@ class WanAny2V:
         conditioning_latents_size = 0,
         keep_frames_parsed = [],
         model_type = None,
+        model_mode = None,
         loras_slists = None,
         NAG_scale = 0,
         NAG_tau = 3.5,
@@ -475,67 +477,63 @@ class WanAny2V:
         phantom = model_type in ["phantom_1.3B", "phantom_14B"]
         fantasy = model_type in ["fantasy"]
         multitalk = model_type in ["multitalk", "vace_multitalk_14B"]
+        recam = model_type in ["recam_1.3B"]
 
         ref_images_count = 0
         trim_frames = 0
         extended_overlapped_latents = None
 
-        # image2video 
         lat_frames = int((frame_num - 1) // self.vae_stride[0]) + 1
-        if image_start != None:
+        # image2video 
+        if model_type in ["i2v", "i2v_2_2", "fantasy", "multitalk", "flf2v_720p"]:
             any_end_frame = False
-            if input_frames != None:
-                _ , preframes_count, height, width = input_frames.shape
+            if image_start is None:
+                _ , preframes_count, height, width = input_video.shape
                 lat_h, lat_w = height // self.vae_stride[1], width // self.vae_stride[2]
-                if hasattr(self, "clip"):                                   
-                    clip_context = self.clip.visual([input_frames[:, -1:]]) if model_type != "flf2v_720p" else self.clip.visual([input_frames[:, -1:], input_frames[:, -1:]])
+                if hasattr(self, "clip"):
+                    clip_image_size = self.clip.model.image_size
+                    clip_image = resize_lanczos(input_video[:, -1], clip_image_size, clip_image_size)[:, None, :, :]
+                    clip_context = self.clip.visual([clip_image]) if model_type != "flf2v_720p" else self.clip.visual([clip_image , clip_image ])
+                    clip_image = None
                 else:
                     clip_context = None
-                input_frames = input_frames.to(device=self.device).to(dtype= self.VAE_dtype)
-                enc =  torch.concat( [input_frames, torch.zeros( (3, frame_num-preframes_count, height, width), 
+                input_video = input_video.to(device=self.device).to(dtype= self.VAE_dtype)
+                enc =  torch.concat( [input_video, torch.zeros( (3, frame_num-preframes_count, height, width), 
                                      device=self.device, dtype= self.VAE_dtype)], 
                                      dim = 1).to(self.device)
-                color_reference_frame = input_frames[:, -1:].clone()
-                input_frames = None
+                color_reference_frame = input_video[:, -1:].clone()
+                input_video = None
             else:
                 preframes_count = 1
-                image_start = TF.to_tensor(image_start)
-                any_end_frame = image_end != None 
+                any_end_frame = image_end is not None 
                 add_frames_for_end_image = any_end_frame and model_type == "i2v"
                 if any_end_frame:
-                    image_end = TF.to_tensor(image_end) 
                     if add_frames_for_end_image:
                         frame_num +=1
                         lat_frames = int((frame_num - 2) // self.vae_stride[0] + 2)
                         trim_frames = 1
                 
-                h, w = image_start.shape[1:]
+                height, width = image_start.shape[1:]
 
-                h, w = calculate_new_dimensions(height, width, h, w, fit_into_canvas)
-                width, height = w, h
-        
                 lat_h = round(
-                    h // self.vae_stride[1] //
+                    height // self.vae_stride[1] //
                     self.patch_size[1] * self.patch_size[1])
                 lat_w = round(
-                    w // self.vae_stride[2] //
+                    width // self.vae_stride[2] //
                     self.patch_size[2] * self.patch_size[2])
-                h = lat_h * self.vae_stride[1]
-                w = lat_w * self.vae_stride[2]
-                img_interpolated = resize_lanczos(image_start, h, w).sub_(0.5).div_(0.5).unsqueeze(0).transpose(0,1).to(self.device) #, self.dtype
-                color_reference_frame = img_interpolated.clone()
-                if image_end!= None:
-                    img_interpolated2 = resize_lanczos(image_end, h, w).sub_(0.5).div_(0.5).unsqueeze(0).transpose(0,1).to(self.device) #, self.dtype
+                height = lat_h * self.vae_stride[1]
+                width = lat_w * self.vae_stride[2]
+                image_start_frame = image_start.unsqueeze(1).to(self.device)
+                color_reference_frame = image_start_frame.clone()
+                if image_end is not None:
+                    img_end_frame = image_end.unsqueeze(1).to(self.device)
 
                 if hasattr(self, "clip"):                                   
                     clip_image_size = self.clip.model.image_size
                     image_start = resize_lanczos(image_start, clip_image_size, clip_image_size)
-                    image_start = image_start.sub_(0.5).div_(0.5).to(self.device) #, self.dtype
-                    if image_end!= None:
-                        image_end = resize_lanczos(image_end, clip_image_size, clip_image_size)
-                        image_end = image_end.sub_(0.5).div_(0.5).to(self.device) #, self.dtype
+                    if image_end is not None: image_end = resize_lanczos(image_end, clip_image_size, clip_image_size)
                     if model_type == "flf2v_720p":                    
-                        clip_context = self.clip.visual([image_start[:, None, :, :], image_end[:, None, :, :] if image_end != None else image_start[:, None, :, :]])
+                        clip_context = self.clip.visual([image_start[:, None, :, :], image_end[:, None, :, :] if image_end is not None else image_start[:, None, :, :]])
                     else:
                         clip_context = self.clip.visual([image_start[:, None, :, :]])
                 else:
@@ -543,17 +541,17 @@ class WanAny2V:
 
                 if any_end_frame:
                     enc= torch.concat([
-                            img_interpolated,
-                            torch.zeros( (3, frame_num-2,  h, w), device=self.device, dtype= self.VAE_dtype),
-                            img_interpolated2,
+                            image_start_frame,
+                            torch.zeros( (3, frame_num-2,  height, width), device=self.device, dtype= self.VAE_dtype),
+                            img_end_frame,
                     ], dim=1).to(self.device)
                 else:
                     enc= torch.concat([
-                            img_interpolated,
-                            torch.zeros( (3, frame_num-1, h, w), device=self.device, dtype= self.VAE_dtype)
+                            image_start_frame,
+                            torch.zeros( (3, frame_num-1, height, width), device=self.device, dtype= self.VAE_dtype)
                     ], dim=1).to(self.device)
 
-                image_start = image_end = img_interpolated = img_interpolated2 = None
+                image_start = image_end = image_start_frame = img_end_frame = None
 
             msk = torch.ones(1, frame_num, lat_h, lat_w, device=self.device)
             if any_end_frame:
@@ -582,11 +580,12 @@ class WanAny2V:
                 kwargs.update({'clip_fea': clip_context})
 
         # Recam Master
-        if target_camera != None:
+        if recam:
+            # should be be in fact in input_frames since it is control video not a video to be extended
+            target_camera = model_mode
             width = input_video.shape[2]
             height = input_video.shape[1]
             input_video = input_video.to(dtype=self.dtype , device=self.device)
-            input_video = input_video.permute(3, 0, 1, 2).div_(127.5).sub_(1.)            
             source_latents = self.vae.encode([input_video])[0] #.to(dtype=self.dtype, device=self.device)
             del input_video
             # Process target camera (recammaster)
@@ -718,8 +717,13 @@ class WanAny2V:
         # init denoising
         updated_num_steps= len(timesteps)
         if callback != None:
-            from wan.utils.utils import update_loras_slists
-            update_loras_slists(self.model, loras_slists, updated_num_steps)
+            from wan.utils.loras_mutipliers import update_loras_slists
+            model_switch_step = updated_num_steps
+            for i, t in enumerate(timesteps):
+                if t <= switch_threshold:
+                    model_switch_step = i
+                    break
+            update_loras_slists(self.model, loras_slists, updated_num_steps, model_switch_step= model_switch_step)
             callback(-1, None, True, override_num_inference_steps = updated_num_steps)
 
         if sample_scheduler != None:

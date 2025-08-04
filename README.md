@@ -20,6 +20,28 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
 
 ## 🔥 Latest Updates : 
+### August 4 2025: WanGP v7.6 - Remuxed
+
+With this new version you won't have any excuse if there is no sound in your video.
+
+*Continue Video* now works with any video that has already some sound (hint: Multitalk ).
+
+Also, on top of MMaudio and the various sound driven models I have added the ability to use your own soundtrack.
+
+As a result you can apply a different sound source on each new video segment when doing a *Continue Video*. 
+
+For instance:
+- first video part: use Multitalk with two people speaking
+- second video part: you apply your own soundtrack which will gently follow the multitalk conversation
+- third video part: you use Vace effect and its corresponding control audio will be concatenated to the rest of the audio
+
+To multiply the combinations I have also implemented *Continue Video* with the various image2video models.
+
+Also:
+- End Frame support added for LTX Video models
+- Loras can now be targetted specifically at the High noise or Low noise models with Wan 2.2, check the Loras and Finetune guides
+- Flux Krea Dev support
+
 ### July 30 2025: WanGP v7.5:  Just another release ... Wan 2.2 part 2
 Here is now Wan 2.2 image2video a very good model if you want to set Start and End frames. Two Wan 2.2 models delivered, only one to go ...
 

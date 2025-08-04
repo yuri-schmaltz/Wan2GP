@@ -343,7 +343,7 @@ def denoise(
 
     updated_num_steps= len(timesteps) -1
     if callback != None:
-        from wgp import update_loras_slists
+        from wan.utils.loras_mutipliers import update_loras_slists
         update_loras_slists(model, loras_slists, updated_num_steps)
         callback(-1, None, True, override_num_inference_steps = updated_num_steps)
     from mmgp import offload

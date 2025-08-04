@@ -303,14 +303,15 @@ class LTXV:
                 frame_width, frame_height  = image_start.size
                 if fit_into_canvas != None:
                     height, width = calculate_new_dimensions(height, width, frame_height, frame_width, fit_into_canvas, 32)
-                conditioning_media_paths.append(image_start) 
+                conditioning_media_paths.append(image_start.unsqueeze(1)) 
                 conditioning_start_frames.append(0)
                 conditioning_control_frames.append(False)
                 prefix_size = 1
-            if image_end != None:
-                conditioning_media_paths.append(image_end) 
-                conditioning_start_frames.append(frame_num-1)
-                conditioning_control_frames.append(False)
+                
+        if image_end != None:
+            conditioning_media_paths.append(image_end.unsqueeze(1)) 
+            conditioning_start_frames.append(frame_num-1)
+            conditioning_control_frames.append(False)
 
         if input_frames!= None:
             conditioning_media_paths.append(input_frames) 

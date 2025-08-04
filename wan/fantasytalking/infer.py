@@ -6,7 +6,7 @@ from .model import FantasyTalkingAudioConditionModel
 from .utils import get_audio_features
 import gc, torch
 
-def parse_audio(audio_path, num_frames, fps = 23, device = "cuda"):
+def parse_audio(audio_path, start_frame, num_frames, fps = 23, device = "cuda"):
     fantasytalking = FantasyTalkingAudioConditionModel(None, 768, 2048).to(device)
     from mmgp import offload
     from accelerate import init_empty_weights
@@ -24,7 +24,7 @@ def parse_audio(audio_path, num_frames, fps = 23, device = "cuda"):
     wav2vec = Wav2Vec2Model.from_pretrained(wav2vec_model_dir, device_map="cpu").eval().requires_grad_(False)
     wav2vec.to(device)
     proj_model.to(device)
-    audio_wav2vec_fea = get_audio_features( wav2vec, wav2vec_processor, audio_path, fps, num_frames )
+    audio_wav2vec_fea = get_audio_features( wav2vec, wav2vec_processor, audio_path, fps, start_frame, num_frames)
 
     audio_proj_fea = proj_model(audio_wav2vec_fea)
     pos_idx_ranges = fantasytalking.split_audio_sequence( audio_proj_fea.size(1), num_frames=num_frames )

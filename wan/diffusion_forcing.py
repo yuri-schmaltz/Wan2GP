@@ -19,7 +19,7 @@ from wan.utils.utils import calculate_new_dimensions
 from .utils.fm_solvers import (FlowDPMSolverMultistepScheduler,
                                get_sampling_sigmas, retrieve_timesteps)
 from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
-from wan.utils.utils import update_loras_slists
+from wan.utils.loras_mutipliers import update_loras_slists
 
 class DTT2V:
 
@@ -199,7 +199,6 @@ class DTT2V:
         self,
         input_prompt: Union[str, List[str]],
         n_prompt: Union[str, List[str]] = "",
-        image_start: PipelineImageInput = None,
         input_video = None,
         height: int = 480,
         width: int = 832,
@@ -242,11 +241,6 @@ class DTT2V:
 
         if input_video != None:
             _ , _ , height, width  = input_video.shape
-        elif image_start != None:
-            image_start = image_start
-            frame_width, frame_height  = image_start.size
-            height, width = calculate_new_dimensions(height, width, frame_height, frame_width, fit_into_canvas)
-            image_start = np.array(image_start.resize((width, height))).transpose(2, 0, 1)
 
 
         latent_length = (frame_num - 1) // 4 + 1 
@@ -276,18 +270,8 @@ class DTT2V:
 
         output_video = input_video
 
-        if image_start is not None or output_video is not None:  # i !=0
-            if output_video is not None:
-                prefix_video = output_video.to(self.device)
-            else:
-                causal_block_size = 1
-                causal_attention = False
-                ar_step = 0
-                prefix_video = image_start
-                prefix_video = torch.tensor(prefix_video).unsqueeze(1)  # .to(image_embeds.dtype).unsqueeze(1)
-                if prefix_video.dtype == torch.uint8:
-                    prefix_video = (prefix_video.float() / (255.0 / 2.0)) - 1.0
-                prefix_video = prefix_video.to(self.device)
+        if output_video is not None:  # i !=0
+            prefix_video = output_video.to(self.device)
             prefix_video = self.vae.encode(prefix_video.unsqueeze(0))[0]  # [(c, f, h, w)]
             predix_video_latent_length = prefix_video.shape[1]
             truncate_len = predix_video_latent_length % causal_block_size
