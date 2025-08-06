@@ -106,12 +106,21 @@ class family_handler():
     @staticmethod
     def query_model_files(computeList, base_model_type, model_filename, text_encoder_quantization):
         text_encoder_filename = family_handler.get_wan_text_encoder_filename(text_encoder_quantization)
-        vae_filepath = "Wan2.2_VAE.safetensors" if base_model_type == "ti2v_2_2" else "Wan2.1_VAE.safetensors"
-        return {
+
+        download_def  = [{
             "repoId" : "DeepBeepMeep/Wan2.1", 
             "sourceFolderList" :  ["xlm-roberta-large", "umt5-xxl", ""  ],
-            "fileList" : [ [ "models_clip_open-clip-xlm-roberta-large-vit-huge-14-bf16.safetensors", "sentencepiece.bpe.model", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json"], ["special_tokens_map.json", "spiece.model", "tokenizer.json", "tokenizer_config.json"] + computeList(text_encoder_filename) , [vae_filepath,  "fantasy_proj_model.safetensors" ] +  computeList(model_filename)  ]   
-        }
+            "fileList" : [ [ "models_clip_open-clip-xlm-roberta-large-vit-huge-14-bf16.safetensors", "sentencepiece.bpe.model", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json"], ["special_tokens_map.json", "spiece.model", "tokenizer.json", "tokenizer_config.json"] + computeList(text_encoder_filename) , ["Wan2.1_VAE.safetensors",  "fantasy_proj_model.safetensors" ] +  computeList(model_filename)  ]   
+        }]
+
+        if base_model_type == "ti2v_2_2":
+            download_def += [    {
+                "repoId" : "DeepBeepMeep/Wan2.2", 
+                "sourceFolderList" :  [""],
+                "fileList" : [ [ "Wan2.2_VAE.safetensors" ]  ]
+            }]
+
+        return download_def
 
 
     @staticmethod
