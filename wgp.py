@@ -1744,6 +1744,12 @@ for path in  ["wan2.1_Vace_1.3B_preview_bf16.safetensors", "sky_reels2_diffusion
         print(f"Removing old version of model '{path}'. A new version of this model will be downloaded next time you use it.")
         os.remove( os.path.join("ckpts" , path))
 
+for f, s in [("ckpts/Florence2/modeling_florence2.py", 127287)]:
+    try:
+        if os.path.isfile(f) and os.path.getsize(f) == s:
+            print(f"Removing old version of model '{f}'. A new version of this model will be downloaded next time you use it.")
+            os.remove(f)
+    except: pass
 
 models_def = {}
 family_handlers = ["models.wan.wan_handler", "models.wan.df_handler", "models.hyvideo.hunyuan_handler", "models.ltx_video.ltxv_handler", "models.flux.flux_handler", "models.qwen.qwen_handler"]
@@ -4550,6 +4556,7 @@ def generate_video(
                     speakers_bboxes =speakers_bboxes,
                     image_mode =  image_mode,
                     video_prompt_type= video_prompt_type,
+                    window_no = window_no, 
                     offloadobj = offloadobj,
                 )
             except Exception as e:
