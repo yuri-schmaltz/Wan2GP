@@ -4,8 +4,8 @@
         "architecture": "qwen_image_20B",
         "description": "Qwen Image is generative model that will very high quality images. It is one of the few models capable to generate in the image very long texts.",
         "URLs": [
-            "https://huggingface.co/DeepBeepMeep/Qwen/resolve/main/qwen_image_20B_bf16.safetensors",
-            "https://huggingface.co/DeepBeepMeep/Qwen/resolve/main/qwen_image_20B_quanto_bf16_int8.safetensors"
+            "https://huggingface.co/DeepBeepMeep/Qwen_image/resolve/main/qwen_image_20B_bf16.safetensors",
+            "https://huggingface.co/DeepBeepMeep/Qwen_image/resolve/main/qwen_image_20B_quanto_bf16_int8.safetensors"
         ],
 		"resolutions":  [ ["1328x1328 (1:1)", "1328x1328"],
 						["1664x928 (16:9)", "1664x928"],
