@@ -83,6 +83,7 @@ class model_factory():
         loras_slists = None,
         batch_size = 1,
         video_prompt_type = "",
+        VAE_tile_size = None, 
         **bbargs
     ):
         # Generate with different aspect ratios
@@ -93,6 +94,11 @@ class model_factory():
         "4:3": (1472, 1140),
         "3:4": (1140, 1472)
         }
+
+        if VAE_tile_size is not None:
+            self.vae.use_tiling  = VAE_tile_size[0] 
+            self.vae.tile_latent_min_height  = VAE_tile_size[1] 
+            self.vae.tile_latent_min_width  = VAE_tile_size[1]
 
         # width, height = aspect_ratios["16:9"]
 

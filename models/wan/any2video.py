@@ -112,7 +112,7 @@ class WanAny2V:
         
         self.vae = vae(
             vae_pth=os.path.join(checkpoint_dir, vae_checkpoint), dtype= VAE_dtype,
-            device=self.device)
+            device="cpu")
         
         # config_filename= "configs/t2v_1.3B.json"
         # import json

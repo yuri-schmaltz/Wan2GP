@@ -674,6 +674,32 @@ class AutoencoderKLQwenImage(ModelMixin, ConfigMixin, FromOriginalModelMixin):
 
     _supports_gradient_checkpointing = False
 
+    @staticmethod
+    def get_VAE_tile_size(vae_config, device_mem_capacity, mixed_precision):
+
+        # VAE Tiling
+        if vae_config == 0:
+            if device_mem_capacity >= 24000:
+                use_vae_config = 1            
+            elif device_mem_capacity >= 8000:
+                use_vae_config = 2
+            else:          
+                use_vae_config = 3
+        else:
+            use_vae_config = vae_config
+
+        use_tiling = False
+        tile_sample_min_width = 256
+
+        if use_vae_config == 1:
+            use_tiling = False
+        elif use_vae_config == 2:
+            use_tiling = True
+        tile_sample_min_width = 256
+
+        return  (use_tiling, tile_sample_min_width)
+
+
     # fmt: off
     @register_to_config
     def __init__(

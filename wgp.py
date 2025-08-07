@@ -1662,8 +1662,8 @@ attention_modes_installed = get_attention_modes()
 attention_modes_supported = get_supported_attention_modes()
 args = _parse_args()
 
-major, minor = torch.cuda.get_device_capability(args.gpu if len(args.gpu) > 0 else None)
-if  major < 8:
+gpu_major, gpu_minor = torch.cuda.get_device_capability(args.gpu if len(args.gpu) > 0 else None)
+if  gpu_major < 8:
     print("Switching to FP16 models when possible as GPU architecture doesn't support optimed BF16 Kernels")
     bfloat16_supported = False
 else:
@@ -3971,7 +3971,13 @@ def generate_video(
         wan_model, offloadobj = load_models(model_type)
         send_cmd("status", "Model loaded")
         reload_needed=  False
-
+    override_attention = model_def.get("attention", None)
+    if override_attention is not None:
+        if isinstance(override_attention, dict):
+            override_attention = override_attention.get(gpu_major, None)
+        if override_attention is not None and override_attention not in attention_modes_supported: override_attention = None
+        if override_attention !=  attention_mode: print(f"Attention mode has been overriden to {override_attention} for model type '{model_type}'")
+    attn = override_attention if override_attention is not None else attention_mode
     if attention_mode == "auto":
         attn = get_auto_attention()
     elif attention_mode in attention_modes_supported:
