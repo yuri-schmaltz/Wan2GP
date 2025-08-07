@@ -55,7 +55,7 @@ class family_handler():
         "cfg_zero" : True,
         "cfg_star" : True,
         "adaptive_projected_guidance" : True,  
-        "skip_steps_cache" : True,
+        "skip_steps_cache" : not (base_model_type in ["i2v_2_2", "ti2v_2_2" ] or "URLs2" in model_def),
         })
 
         return extra_model_def
