@@ -504,7 +504,7 @@ class WanAny2V:
         timestep_injection = False
         lat_frames = int((frame_num - 1) // self.vae_stride[0]) + 1
         # image2video 
-        if model_type in ["i2v", "i2v_2_2", "fantasy", "multitalk", "flf2v_720p"]:
+        if model_type in ["i2v", "i2v_2_2", "fun_inp_1.3B", "fun_inp", "fantasy", "multitalk", "flf2v_720p"]:
             any_end_frame = False
             if image_start is None:
                 _ , preframes_count, height, width = input_video.shape
