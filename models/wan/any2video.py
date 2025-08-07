@@ -113,6 +113,7 @@ class WanAny2V:
         self.vae = vae(
             vae_pth=os.path.join(checkpoint_dir, vae_checkpoint), dtype= VAE_dtype,
             device="cpu")
+        self.vae.device = self.device
         
         # config_filename= "configs/t2v_1.3B.json"
         # import json
@@ -467,7 +468,6 @@ class WanAny2V:
         color_reference_frame = None
         if self._interrupt:
             return None
-        
         # Text Encoder
         if n_prompt == "":
             n_prompt = self.sample_neg_prompt
