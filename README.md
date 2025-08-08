@@ -25,7 +25,7 @@ Ever wondered what impact not using Guidance has on a model that expects it ? Ju
 
 As Qwen is not so picky after all I have added also quantized text encoder which reduces the RAM requirements of Qwen by 10 GB (the text encoder quantized version produced garbage before) 
 
-Hopefully this new release solves as well the Sage/Sage2 blacscreen on some GPUs.
+Unfortunately still the Sage bug for older GPU architectures. Added Sdpa fallback for these architectures.
 
 *7.73 update: still Sage / Sage2 bug for GPUs before RTX40xx. I have added a detection mechanism that forces Sdpa attention if that's the case*
 
