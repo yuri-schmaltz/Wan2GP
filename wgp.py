@@ -18,7 +18,7 @@ from shared.utils import notification_sound
 from shared.utils.loras_mutipliers import preparse_loras_multipliers, parse_loras_multipliers
 from shared.utils.utils import cache_video, convert_tensor_to_image, save_image, get_video_info, get_file_creation_date, convert_image_to_video
 from shared.utils.utils import extract_audio_tracks, combine_video_with_audio_tracks, combine_and_concatenate_video_with_audio_tracks, cleanup_temp_audio_files, calculate_new_dimensions
-
+from shared.match_archi import match_nvidia_architecture
 from shared.attention import get_attention_modes, get_supported_attention_modes
 from huggingface_hub import hf_hub_download, snapshot_download    
 import torch
@@ -50,7 +50,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.5.7"
-WanGP_version = "7.72"
+WanGP_version = "7.73"
 settings_version = 2.23
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -2670,12 +2670,15 @@ def generate_header(model_type, compile, attention_mode):
     model_filename = get_model_filename(model_type, transformer_quantization, transformer_dtype_policy) or "" 
     description  = description_container[0]
     header = f"<DIV style=height:{60 if server_config.get('display_stats', 0) == 1 else 40}px>{description}</DIV>"
-
-    header += "<DIV style='align:right;width:100%'><FONT SIZE=3>Attention mode <B>" + (attention_mode if attention_mode!="auto" else "auto/" + get_auto_attention() )
+    overridden_attention = get_overridden_attention(model_type)
+    attn_mode = attention_mode if overridden_attention == None else overridden_attention 
+    header += "<DIV style='align:right;width:100%'><FONT SIZE=3>Attention mode <B>" + (attn_mode if attn_mode!="auto" else "auto/" + get_auto_attention() )
     if attention_mode not in attention_modes_installed:
         header += " -NOT INSTALLED-"
     elif attention_mode not in attention_modes_supported:
         header += " -NOT SUPPORTED-"
+    elif overridden_attention is not None and attention_mode != overridden_attention:
+        header += " -MODEL SPECIFIC-"
     header += "</B>"
 
     if compile:
@@ -3821,6 +3824,17 @@ def edit_video(
         cleanup_temp_audio_files(audio_tracks)
     clear_status(state)
 
+def get_overridden_attention(model_type):
+    model_def = get_model_def(model_type)
+    override_attention = model_def.get("attention", None)
+    if override_attention is None: return None
+    gpu_version = gpu_major * 10 + gpu_minor
+    attention_list = match_nvidia_architecture(override_attention, gpu_version) 
+    if len(attention_list ) == 0: return None
+    override_attention = attention_list[0]
+    if override_attention is not None and override_attention not in attention_modes_supported: return None
+    return override_attention
+
 def get_transformer_loras(model_type):
     model_def = get_model_def(model_type)
     transformer_loras_filenames = get_model_recursive_prop(model_type, "loras", return_list=True)
@@ -3971,13 +3985,9 @@ def generate_video(
         wan_model, offloadobj = load_models(model_type)
         send_cmd("status", "Model loaded")
         reload_needed=  False
-    override_attention = model_def.get("attention", None)
-    if override_attention is not None:
-        if isinstance(override_attention, dict):
-            override_attention = override_attention.get(gpu_major, None)
-        if override_attention is not None and override_attention not in attention_modes_supported: override_attention = None
-        if override_attention !=  attention_mode: print(f"Attention mode has been overriden to {override_attention} for model type '{model_type}'")
-    attn = override_attention if override_attention is not None else attention_mode
+    overridden_attention = get_overridden_attention(model_type)
+    # if overridden_attention is not None and overridden_attention !=  attention_mode: print(f"Attention mode has been overriden to {overridden_attention} for model type '{model_type}'")
+    attn = overridden_attention if overridden_attention is not None else attention_mode
     if attention_mode == "auto":
         attn = get_auto_attention()
     elif attention_mode in attention_modes_supported:
