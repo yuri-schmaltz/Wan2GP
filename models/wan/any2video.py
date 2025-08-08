@@ -656,7 +656,7 @@ class WanAny2V:
                 height, width = (height // 32) * 32, (width // 32) * 32 
             else:
                 height, width = input_video.shape[-2:]
-                source_latents = self.vae.encode([input_video])[0].unsqueeze(0)
+                source_latents = self.vae.encode([input_video], tile_size = VAE_tile_size)[0].unsqueeze(0)
                 timestep_injection = True
 
         # Vace

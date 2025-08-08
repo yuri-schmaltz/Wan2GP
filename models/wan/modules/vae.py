@@ -520,6 +520,8 @@ def count_conv3d(model):
 
 class WanVAE_(nn.Module):
 
+    _offload_hooks = ['encode', 'decode']
+
     def __init__(self,
                  dim=128,
                  z_dim=4,
