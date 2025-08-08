@@ -512,53 +512,30 @@ class QwenImageTransformer2DModel(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
-        encoder_hidden_states: torch.Tensor = None,
-        encoder_hidden_states_mask: torch.Tensor = None,
+        encoder_hidden_states_list  = None,
+        encoder_hidden_states_mask_list = None,
         timestep: torch.LongTensor = None,
         img_shapes: Optional[List[Tuple[int, int, int]]] = None,
-        txt_seq_lens: Optional[List[int]] = None,
+        txt_seq_lens_list  = None,
         guidance: torch.Tensor = None,  # TODO: this should probably be removed
         attention_kwargs: Optional[Dict[str, Any]] = None,
-        return_dict: bool = True,
         callback= None,
         pipeline =None,
     ) -> Union[torch.Tensor, Transformer2DModelOutput]:
-        """
-        The [`QwenTransformer2DModel`] forward method.
-
-        Args:
-            hidden_states (`torch.Tensor` of shape `(batch_size, image_sequence_length, in_channels)`):
-                Input `hidden_states`.
-            encoder_hidden_states (`torch.Tensor` of shape `(batch_size, text_sequence_length, joint_attention_dim)`):
-                Conditional embeddings (embeddings computed from the input conditions such as prompts) to use.
-            encoder_hidden_states_mask (`torch.Tensor` of shape `(batch_size, text_sequence_length)`):
-                Mask of the input conditions.
-            timestep ( `torch.LongTensor`):
-                Used to indicate denoising step.
-            attention_kwargs (`dict`, *optional*):
-                A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
-                `self.processor` in
-                [diffusers.models.attention_processor](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/attention_processor.py).
-            return_dict (`bool`, *optional*, defaults to `True`):
-                Whether or not to return a [`~models.transformer_2d.Transformer2DModelOutput`] instead of a plain
-                tuple.
-
-        Returns:
-            If `return_dict` is True, an [`~models.transformer_2d.Transformer2DModelOutput`] is returned, otherwise a
-            `tuple` where the first element is the sample tensor.
-        """
-        if attention_kwargs is not None:
-            attention_kwargs = attention_kwargs.copy()
-            lora_scale = attention_kwargs.pop("scale", 1.0)
-        else:
-            lora_scale = 1.0
+        
 
         hidden_states = self.img_in(hidden_states)
-
         timestep = timestep.to(hidden_states.dtype)
-        encoder_hidden_states = self.txt_norm(encoder_hidden_states)
-        encoder_hidden_states = self.txt_in(encoder_hidden_states)
-
+        hidden_states_list = [hidden_states if i == 0 else hidden_states.clone() for i, _ in enumerate(encoder_hidden_states_list)]
+        
+        new_encoder_hidden_states_list = []
+        for encoder_hidden_states in encoder_hidden_states_list:
+            encoder_hidden_states = self.txt_norm(encoder_hidden_states)
+            encoder_hidden_states = self.txt_in(encoder_hidden_states)
+            new_encoder_hidden_states_list.append(encoder_hidden_states)
+        encoder_hidden_states_list = new_encoder_hidden_states_list
+        new_encoder_hidden_states_list = encoder_hidden_states = None
+        
         if guidance is not None:
             guidance = guidance.to(hidden_states.dtype) * 1000
 
@@ -568,27 +545,30 @@ class QwenImageTransformer2DModel(nn.Module):
             else self.time_text_embed(timestep, guidance, hidden_states)
         )
 
-        image_rotary_emb = self.pos_embed(img_shapes, txt_seq_lens, device=hidden_states.device)
+        image_rotary_emb_list = [ self.pos_embed(img_shapes, txt_seq_lens, device=hidden_states.device) for txt_seq_lens in txt_seq_lens_list] 
+
+        hidden_states = None
 
         for index_block, block in enumerate(self.transformer_blocks):
             if callback != None:
                 callback(-1, None, False, True)
             if pipeline._interrupt:
-                return [None]
-            encoder_hidden_states, hidden_states = block(
-                hidden_states=hidden_states,
-                encoder_hidden_states=encoder_hidden_states,
-                encoder_hidden_states_mask=encoder_hidden_states_mask,
-                temb=temb,
-                image_rotary_emb=image_rotary_emb,
-                joint_attention_kwargs=attention_kwargs,
-            )
+                return [None] * len(hidden_states_list)
+            for hidden_states, encoder_hidden_states, encoder_hidden_states_mask, image_rotary_emb in zip(hidden_states_list, encoder_hidden_states_list, encoder_hidden_states_mask_list, image_rotary_emb_list):
+                encoder_hidden_states[...], hidden_states[...] = block(
+                    hidden_states=hidden_states,
+                    encoder_hidden_states=encoder_hidden_states,
+                    encoder_hidden_states_mask=encoder_hidden_states_mask,
+                    temb=temb,
+                    image_rotary_emb=image_rotary_emb,
+                    joint_attention_kwargs=attention_kwargs,
+                )
 
         # Use only the image part (hidden_states) from the dual-stream blocks
-        hidden_states = self.norm_out(hidden_states, temb)
-        output = self.proj_out(hidden_states)
+        output_list = []
+        for i in range(len(hidden_states_list)):
+            hidden_states = self.norm_out(hidden_states_list[i], temb)
+            hidden_states_list[i] = None
+            output_list.append(self.proj_out(hidden_states))
 
-        if not return_dict:
-            return (output,)
-
-        return Transformer2DModelOutput(sample=output)
+        return output_list

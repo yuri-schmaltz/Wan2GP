@@ -2,7 +2,7 @@ import torch
 
 def get_qwen_text_encoder_filename(text_encoder_quantization):
     text_encoder_filename = "ckpts/Qwen2.5-VL-7B-Instruct/Qwen2.5-VL-7B-Instruct_bf16.safetensors"
-    if text_encoder_quantization =="int8" and False:
+    if text_encoder_quantization =="int8":
         text_encoder_filename = text_encoder_filename.replace("bf16", "quanto_bf16_int8") 
     return text_encoder_filename
 
@@ -11,10 +11,8 @@ class family_handler():
     def query_model_def(base_model_type, model_def):
         model_def_output = {
             "image_outputs" : True,
-            "no_negative_prompt" : True,
         }
 
-        model_def_output["embedded_guidance"] = True
 
         return model_def_output
 
@@ -69,7 +67,7 @@ class family_handler():
     @staticmethod
     def update_default_settings(base_model_type, model_def, ui_defaults):
         ui_defaults.update({
-            "embedded_guidance":  4,
+            "guidance_scale":  4,
         })            
         if model_def.get("reference_image", False):
             ui_defaults.update({

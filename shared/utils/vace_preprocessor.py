@@ -184,7 +184,7 @@ class VaceVideoProcessor(object):
 
         
     def _get_frameid_bbox_adjust_last(self, fps, video_frames_count, canvas_height, canvas_width, h, w,  fit_into_canvas, crop_box, rng, max_frames= 0, start_frame =0):
-        from wan.utils.utils import resample
+        from shared.utils.utils import resample
 
         target_fps = self.max_fps
 

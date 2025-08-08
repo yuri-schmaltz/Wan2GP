@@ -73,6 +73,7 @@ class model_factory():
         self,
         seed: int | None = None,
         input_prompt: str = "replace the logo with the text 'Black Forest Labs'",
+        n_prompt = None,
         sampling_steps: int = 20,
         input_ref_images = None,
         width= 832,
@@ -84,6 +85,7 @@ class model_factory():
         batch_size = 1,
         video_prompt_type = "",
         VAE_tile_size = None, 
+        joint_pass = True,
         **bbargs
     ):
         # Generate with different aspect ratios
@@ -94,7 +96,7 @@ class model_factory():
         "4:3": (1472, 1140),
         "3:4": (1140, 1472)
         }
-
+        
         if VAE_tile_size is not None:
             self.vae.use_tiling  = VAE_tile_size[0] 
             self.vae.tile_latent_min_height  = VAE_tile_size[1] 
@@ -102,8 +104,12 @@ class model_factory():
 
         # width, height = aspect_ratios["16:9"]
 
+        if n_prompt is None or len(n_prompt) == 0:
+            n_prompt=  "text, watermark, copyright, blurry, low resolution"
+
         image = self.pipeline(
         prompt=input_prompt,
+        negative_prompt=n_prompt,
         width=width,
         height=height,
         num_inference_steps=sampling_steps,
@@ -112,6 +118,7 @@ class model_factory():
         callback = callback,
         pipeline=self,
         loras_slists=loras_slists,
+        joint_pass = joint_pass,
         generator=torch.Generator(device="cuda").manual_seed(seed)
         )        
         if image is None: return None

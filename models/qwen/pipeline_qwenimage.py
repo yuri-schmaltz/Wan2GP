@@ -458,6 +458,7 @@ class QwenImagePipeline(): #DiffusionPipeline
         callback=None,
         pipeline=None,
         loras_slists=None,
+        joint_pass= True,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -656,43 +657,55 @@ class QwenImagePipeline(): #DiffusionPipeline
             # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
             timestep = t.expand(latents.shape[0]).to(latents.dtype)
 
-            noise_pred = self.transformer(
-                hidden_states=latents,
-                timestep=timestep / 1000,
-                guidance=guidance,
-                encoder_hidden_states_mask=prompt_embeds_mask,
-                encoder_hidden_states=prompt_embeds,
-                img_shapes=img_shapes,
-                txt_seq_lens=prompt_embeds_mask.sum(dim=1).tolist(),
-                attention_kwargs=self.attention_kwargs,
-                return_dict=False,
-                **kwargs
-            )[0]
-            if noise_pred == None: return None
-
-
-            if do_true_cfg:
-                # with self.transformer.cache_context("uncond"):
-                neg_noise_pred = self.transformer(
+            if do_true_cfg and joint_pass:
+                noise_pred, neg_noise_pred = self.transformer(
                     hidden_states=latents,
                     timestep=timestep / 1000,
                     guidance=guidance,
-                    encoder_hidden_states_mask=negative_prompt_embeds_mask,
-                    encoder_hidden_states=negative_prompt_embeds,
+                    encoder_hidden_states_mask_list=[prompt_embeds_mask,negative_prompt_embeds_mask],
+                    encoder_hidden_states_list=[prompt_embeds, negative_prompt_embeds],
                     img_shapes=img_shapes,
-                    txt_seq_lens=negative_prompt_embeds_mask.sum(dim=1).tolist(),
+                    txt_seq_lens_list=[prompt_embeds_mask.sum(dim=1).tolist(),negative_prompt_embeds_mask.sum(dim=1).tolist()],
                     attention_kwargs=self.attention_kwargs,
-                    return_dict=False,
+                    **kwargs
+                )
+                if noise_pred == None: return None
+            else:
+                noise_pred = self.transformer(
+                    hidden_states=latents,
+                    timestep=timestep / 1000,
+                    guidance=guidance,
+                    encoder_hidden_states_mask_list=[prompt_embeds_mask],
+                    encoder_hidden_states_list=[prompt_embeds],
+                    img_shapes=img_shapes,
+                    txt_seq_lens_list=[prompt_embeds_mask.sum(dim=1).tolist()],
+                    attention_kwargs=self.attention_kwargs,
                     **kwargs
                 )[0]
-                if neg_noise_pred == None: return None
+                if noise_pred == None: return None
+
+                if do_true_cfg:
+                    neg_noise_pred = self.transformer(
+                        hidden_states=latents,
+                        timestep=timestep / 1000,
+                        guidance=guidance,
+                        encoder_hidden_states_mask_list=[negative_prompt_embeds_mask],
+                        encoder_hidden_states_list=[negative_prompt_embeds],
+                        img_shapes=img_shapes,
+                        txt_seq_lens_list=[negative_prompt_embeds_mask.sum(dim=1).tolist()],
+                        attention_kwargs=self.attention_kwargs,
+                        **kwargs
+                    )[0]
+                    if neg_noise_pred == None: return None
+
+            if do_true_cfg:
                 comb_pred = neg_noise_pred + true_cfg_scale * (noise_pred - neg_noise_pred)
                 if comb_pred == None: return None
 
                 cond_norm = torch.norm(noise_pred, dim=-1, keepdim=True)
                 noise_norm = torch.norm(comb_pred, dim=-1, keepdim=True)
                 noise_pred = comb_pred * (cond_norm / noise_norm)
-
+                neg_noise_pred = None
             # compute the previous noisy sample x_t -> x_t-1
             latents_dtype = latents.dtype
             latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0]
