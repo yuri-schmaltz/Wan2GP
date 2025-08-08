@@ -49,7 +49,7 @@ global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
-target_mmgp_version = "3.5.6"
+target_mmgp_version = "3.5.7"
 WanGP_version = "7.71"
 settings_version = 2.23
 max_source_video_frames = 3000
