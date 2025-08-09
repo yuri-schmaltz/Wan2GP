@@ -460,6 +460,7 @@ class WanAny2V:
                 sigmas=sampling_sigmas)
         else:
             raise NotImplementedError(f"Unsupported Scheduler {sample_solver}")
+        original_timesteps = timesteps
 
         seed_g = torch.Generator(device=self.device)
         seed_g.manual_seed(seed)
@@ -497,7 +498,7 @@ class WanAny2V:
         multitalk = model_type in ["multitalk", "vace_multitalk_14B"]
         recam = model_type in ["recam_1.3B"]
         ti2v = model_type in ["ti2v_2_2"]
-
+        start_step_no = 0
         ref_images_count = 0
         trim_frames = 0
         extended_overlapped_latents = None
@@ -638,6 +639,7 @@ class WanAny2V:
                             latent_keep_frames.append(all(keep_frames_parsed[i:i+4]))
                 else:
                     timesteps = timesteps[injection_denoising_step:]
+                    start_step_no = injection_denoising_step
                     if hasattr(sample_scheduler, "timesteps"): sample_scheduler.timesteps = timesteps
                     if hasattr(sample_scheduler, "sigmas"): sample_scheduler.sigmas= sample_scheduler.sigmas[injection_denoising_step:]
                     injection_denoising_step = 0
@@ -722,16 +724,17 @@ class WanAny2V:
         kwargs["freqs"] = freqs
 
         # Steps Skipping
-        cache_type = self.model.enable_cache 
-        if cache_type != None:
+        skip_steps_cache = self.model.cache
+        if skip_steps_cache != None:
+            cache_type = skip_steps_cache.cache_type
             x_count = 3 if phantom or fantasy or multitalk else 2
-            self.model.previous_residual = [None] * x_count
+            skip_steps_cache.previous_residual = [None] * x_count
             if cache_type == "tea":
-                self.model.compute_teacache_threshold(self.model.cache_start_step, timesteps, self.model.cache_multiplier)
+                self.model.compute_teacache_threshold(max(skip_steps_cache.start_step, start_step_no), original_timesteps, skip_steps_cache.multiplier)
             else: 
-                self.model.compute_magcache_threshold(self.model.cache_start_step, timesteps, self.model.cache_multiplier)
-                self.model.accumulated_err, self.model.accumulated_steps, self.model.accumulated_ratio  = [0.0] * x_count, [0] * x_count, [1.0] * x_count
-                self.model.one_for_all = x_count > 2
+                self.model.compute_magcache_threshold(max(skip_steps_cache.start_step, start_step_no), original_timesteps, skip_steps_cache.multiplier)
+                skip_steps_cache.accumulated_err, skip_steps_cache.accumulated_steps, skip_steps_cache.accumulated_ratio  = [0.0] * x_count, [0] * x_count, [1.0] * x_count
+                skip_steps_cache.one_for_all = x_count > 2
 
         if callback != None:
             callback(-1, None, True)
@@ -781,7 +784,7 @@ class WanAny2V:
                 timestep = torch.full((target_shape[-3],), t, dtype=torch.int64, device=latents.device)
                 timestep[:source_latents.shape[2]] = 0
                         
-            kwargs.update({"t": timestep, "current_step": i})  
+            kwargs.update({"t": timestep, "current_step": start_step_no + i})  
             kwargs["slg_layers"] = slg_layers if int(slg_start * sampling_steps) <= i < int(slg_end * sampling_steps) else None
 
             if denoising_strength < 1 and input_frames != None and i <= injection_denoising_step:

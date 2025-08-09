@@ -44,7 +44,7 @@ def parse_loras_multipliers(loras_multipliers, nb_loras, num_inference_steps, me
     slists_dict["phase2"] = phase2 = [1.] * nb_loras
 
     if isinstance(loras_multipliers, list) or len(loras_multipliers) > 0:
-        list_mult_choices_list = preparse_loras_multipliers(loras_multipliers)
+        list_mult_choices_list = preparse_loras_multipliers(loras_multipliers)[:nb_loras]
         for i, mult in enumerate(list_mult_choices_list):
             current_phase = phase1
             if isinstance(mult, str):

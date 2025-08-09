@@ -934,15 +934,20 @@ class HunyuanVideoAudioPipeline(DiffusionPipeline):
 
         transformer = self.transformer
 
-        if transformer.enable_cache == "tea":
-            teacache_multiplier = transformer.cache_multiplier
-            transformer.accumulated_rel_l1_distance = 0
-            transformer.rel_l1_thresh = 0.1 if teacache_multiplier < 2 else 0.15
-        elif transformer.enable_cache == "mag":
-            transformer.compute_magcache_threshold(transformer.cache_start_step, num_inference_steps, transformer.cache_multiplier)
-            transformer.accumulated_err, transformer.accumulated_steps, transformer.accumulated_ratio  = 0, 0, 1.0
-        else:
-            transformer.enable_cache == None
+        skip_steps_cache = transformer.cache
+        cache_type = None
+        if skip_steps_cache != None:
+            cache_type = skip_steps_cache.cache_type 
+            if cache_type == "tea":
+                teacache_multiplier = skip_steps_cache.multiplier
+                skip_steps_cache.accumulated_rel_l1_distance = 0
+                skip_steps_cache.rel_l1_thresh = 0.1 if teacache_multiplier < 2 else 0.15
+            elif cache_type == "mag":
+                transformer.compute_magcache_threshold(skip_steps_cache.start_step, num_inference_steps, skip_steps_cache.multiplier)
+                skip_steps_cache.accumulated_err, skip_steps_cache.accumulated_steps, skip_steps_cache.accumulated_ratio  = 0, 0, 1.0
+            else:
+                transformer.cache = None
+                cache_type = None
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
@@ -1141,16 +1146,16 @@ class HunyuanVideoAudioPipeline(DiffusionPipeline):
         if self._interrupt:
             return [None]
 
-        if transformer.enable_cache == "tea":
+        if cache_type == "tea":
             cache_size = round( infer_length / frames_per_batch )
-            transformer.previous_residual = [None] * latent_items
+            skip_steps_cache.previous_residual = [None] * latent_items
             cache_all_previous_residual =  [None] * latent_items
             cache_all_previous_modulated_input = None
             cache_should_calc = [True] * cache_size 
             cache_accumulated_rel_l1_distance = [0.] * cache_size
             cache_teacache_skipped_steps = [0] * cache_size
-        elif transformer.enable_cache == "mag":
-            transformer.previous_residual = [None] * latent_items
+        elif cache_type == "mag":
+            skip_steps_cache.previous_residual = [None] * latent_items
 
 
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -1187,16 +1192,16 @@ class HunyuanVideoAudioPipeline(DiffusionPipeline):
                     img_ref_len = (latent_model_input.shape[-1] // 2)  * (latent_model_input.shape[-2] // 2) * ( 1) 
                     img_all_len = (latents_all.shape[-1] // 2)  * (latents_all.shape[-2] // 2) * latents_all.shape[-3]
 
-                    if transformer.enable_cache == "tea" and cache_size > 1:
+                    if cache_type == "tea" and cache_size > 1:
                         for l in range(latent_items):
                             if cache_all_previous_residual[l] != None:
                                 bsz = cache_all_previous_residual[l].shape[0]
-                                transformer.previous_residual[l][:, img_ref_len:] = cache_all_previous_residual[l].reshape(1, -1, embedded_hw) [:, idx_list].reshape(1, -1, 3072)
+                                skip_steps_cache.previous_residual[l][:, img_ref_len:] = cache_all_previous_residual[l].reshape(1, -1, embedded_hw) [:, idx_list].reshape(1, -1, 3072)
                         if cache_all_previous_modulated_input != None:
-                            transformer.previous_modulated_input[:, img_ref_len:] = cache_all_previous_modulated_input.reshape(1, -1, embedded_hw) [:, idx_list].reshape(1, -1, 3072)
-                        transformer.should_calc = cache_should_calc[cache_slot_no]  
-                        transformer.accumulated_rel_l1_distance = cache_accumulated_rel_l1_distance[cache_slot_no]
-                        transformer.teacache_skipped_steps = cache_teacache_skipped_steps[cache_slot_no]
+                            skip_steps_cache.previous_modulated_input[:, img_ref_len:] = cache_all_previous_modulated_input.reshape(1, -1, embedded_hw) [:, idx_list].reshape(1, -1, 3072)
+                        skip_steps_cache.should_calc = cache_should_calc[cache_slot_no]  
+                        skip_steps_cache.accumulated_rel_l1_distance = cache_accumulated_rel_l1_distance[cache_slot_no]
+                        skip_steps_cache.teacache_skipped_steps = cache_teacache_skipped_steps[cache_slot_no]
 
 
                     if self.do_classifier_free_guidance:
@@ -1304,21 +1309,21 @@ class HunyuanVideoAudioPipeline(DiffusionPipeline):
                         pred_latents[:, :, p] += latents[:, :, iii]
                         counter[:, :, p] += 1
 
-                    if transformer.enable_cache == "tea" and cache_size > 1:
+                    if cache_type == "tea" and cache_size > 1:
                         for l in range(latent_items):
-                            if transformer.previous_residual[l] != None:
-                                bsz = transformer.previous_residual[l].shape[0]
+                            if skip_steps_cache.previous_residual[l] != None:
+                                bsz = skip_steps_cache.previous_residual[l].shape[0]
                                 if cache_all_previous_residual[l] == None:
-                                    cache_all_previous_residual[l] = torch.zeros((bsz, img_all_len, 3072 ), device=transformer.previous_residual[l].device, dtype=transformer.previous_residual[l].dtype)
-                                cache_all_previous_residual[l].reshape(bsz, -1, embedded_hw)[:, idx_list] = transformer.previous_residual[l][:, img_ref_len:].reshape(bsz, -1, embedded_hw)
+                                    cache_all_previous_residual[l] = torch.zeros((bsz, img_all_len, 3072 ), device=skip_steps_cache.previous_residual[l].device, dtype=skip_steps_cache.previous_residual[l].dtype)
+                                cache_all_previous_residual[l].reshape(bsz, -1, embedded_hw)[:, idx_list] = skip_steps_cache.previous_residual[l][:, img_ref_len:].reshape(bsz, -1, embedded_hw)
 
-                        if transformer.previous_modulated_input  != None:
+                        if skip_steps_cache.previous_modulated_input  != None:
                             if cache_all_previous_modulated_input == None:
-                                cache_all_previous_modulated_input = torch.zeros((1, img_all_len, 3072 ), device=transformer.previous_modulated_input.device, dtype=transformer.previous_modulated_input.dtype)
-                            cache_all_previous_modulated_input.reshape(1, -1, embedded_hw)[:, idx_list] = transformer.previous_modulated_input[:, img_ref_len:].reshape(1, -1, embedded_hw)
-                        cache_should_calc[cache_slot_no]  = transformer.should_calc 
-                        cache_accumulated_rel_l1_distance[cache_slot_no]  = transformer.accumulated_rel_l1_distance
-                        cache_teacache_skipped_steps[cache_slot_no]  = transformer.teacache_skipped_steps
+                                cache_all_previous_modulated_input = torch.zeros((1, img_all_len, 3072 ), device=skip_steps_cache.previous_modulated_input.device, dtype=skip_steps_cache.previous_modulated_input.dtype)
+                            cache_all_previous_modulated_input.reshape(1, -1, embedded_hw)[:, idx_list] = skip_steps_cache.previous_modulated_input[:, img_ref_len:].reshape(1, -1, embedded_hw)
+                        cache_should_calc[cache_slot_no]  = skip_steps_cache.should_calc 
+                        cache_accumulated_rel_l1_distance[cache_slot_no]  = skip_steps_cache.accumulated_rel_l1_distance
+                        cache_teacache_skipped_steps[cache_slot_no]  = skip_steps_cache.teacache_skipped_steps
 
                     cache_slot_no += 1
 

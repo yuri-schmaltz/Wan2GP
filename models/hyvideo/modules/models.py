@@ -794,6 +794,8 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
             block.disable_deterministic()
 
     def compute_magcache_threshold(self, start_step, num_inference_steps = 0, speed_factor =0):
+        skips_step_cache = self.cache
+
         def nearest_interp(src_array, target_length):
             src_length = len(src_array)
             if target_length == 1:
@@ -801,11 +803,11 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
             scale = (src_length - 1) / (target_length - 1)
             mapped_indices = np.round(np.arange(target_length) * scale).astype(int)
             return src_array[mapped_indices]
-        
-        if len(self.def_mag_ratios) != num_inference_steps:
-            self.mag_ratios = nearest_interp(self.def_mag_ratios, num_inference_steps)
+        def_mag_ratios = np.array([1.0]+ skips_step_cache.def_mag_ratios)
+        if len(def_mag_ratios) != num_inference_steps:
+            skips_step_cache.mag_ratios = nearest_interp(def_mag_ratios, num_inference_steps)
         else:
-            self.mag_ratios = self.def_mag_ratios
+            skips_step_cache.mag_ratios = def_mag_ratios
 
         best_deltas = None
         best_threshold = 0.01
@@ -821,12 +823,12 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                 if i<=start_step:
                     skip  = False
                 else:
-                    cur_mag_ratio = self.mag_ratios[i] # conditional and unconditional in one list
+                    cur_mag_ratio = skips_step_cache.mag_ratios[i] # conditional and unconditional in one list
                     accumulated_ratio *= cur_mag_ratio # magnitude ratio between current step and the cached step
                     accumulated_steps += 1 # skip steps plus 1
                     cur_skip_err = np.abs(1-accumulated_ratio) # skip error of current steps
                     accumulated_err += cur_skip_err # accumulated error of multiple steps
-                    if accumulated_err<threshold and accumulated_steps<=self.magcache_K:
+                    if accumulated_err<threshold and accumulated_steps<=skips_step_cache.magcache_K:
                         skip  = True
                     else:
                         skip  = False
@@ -842,7 +844,7 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
             elif diff > best_diff:
                 break
             threshold += 0.01
-        self.magcache_thresh = best_threshold
+        skips_step_cache.magcache_thresh = best_threshold
         print(f"Mag Cache, best threshold found:{best_threshold:0.2f} with gain x{num_inference_steps/(target_nb_steps - best_signed_diff):0.2f} for a target of x{speed_factor}")
         return best_threshold
 
@@ -969,23 +971,24 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
         attn_mask = None
 
         freqs_cis = (freqs_cos, freqs_sin) if freqs_cos is not None else None
-        
-
-        if self.enable_cache:
+        should_calc = True
+        skip_steps_cache  = self.cache
+        if skip_steps_cache is not None:
+            cache_type = skip_steps_cache.cache_type
             if x_id == 0:
-                self.should_calc = True
-                if self.enable_cache == "mag":
-                    if step_no > self.cache_start_step:
-                        cur_mag_ratio = self.mag_ratios[step_no]
-                        self.accumulated_ratio = self.accumulated_ratio*cur_mag_ratio
-                        cur_skip_err = np.abs(1-self.accumulated_ratio)
-                        self.accumulated_err += cur_skip_err
-                        self.accumulated_steps += 1
-                        if self.accumulated_err<=self.magcache_thresh and self.accumulated_steps<=self.magcache_K:
-                            self.should_calc = False
-                            self.cache_skipped_steps += 1
+                skip_steps_cache.should_calc = True
+                if cache_type == "mag":
+                    if step_no > skip_steps_cache.start_step:
+                        cur_mag_ratio = skip_steps_cache.mag_ratios[step_no]
+                        skip_steps_cache.accumulated_ratio = skip_steps_cache.accumulated_ratio*cur_mag_ratio
+                        cur_skip_err = np.abs(1-skip_steps_cache.accumulated_ratio)
+                        skip_steps_cache.accumulated_err += cur_skip_err
+                        skip_steps_cache.accumulated_steps += 1
+                        if skip_steps_cache.accumulated_err<=skip_steps_cache.magcache_thresh and skip_steps_cache.accumulated_steps<=skip_steps_cache.magcache_K:
+                            skip_steps_cache.should_calc = False
+                            skip_steps_cache.skipped_steps += 1
                         else:
-                            self.accumulated_ratio, self.accumulated_steps, self.accumulated_err = 1.0, 0, 0
+                            skip_steps_cache.accumulated_ratio, skip_steps_cache.accumulated_steps, skip_steps_cache.accumulated_err = 1.0, 0, 0
                 else:
                     inp = img[0:1] 
                     vec_ = vec[0:1] 
@@ -994,26 +997,24 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                     normed_inp = normed_inp.to(torch.bfloat16)
                     modulated_inp = modulate( normed_inp, shift=img_mod1_shift, scale=img_mod1_scale )
                     del normed_inp, img_mod1_shift, img_mod1_scale
-                    if step_no <= self.cache_start_step or step_no == self.num_steps-1:
-                        self.accumulated_rel_l1_distance = 0
-                    else: 
-                        coefficients = [7.33226126e+02, -4.01131952e+02,  6.75869174e+01, -3.14987800e+00, 9.61237896e-02]
-                        rescale_func = np.poly1d(coefficients)
-                        self.accumulated_rel_l1_distance += rescale_func(((modulated_inp-self.previous_modulated_input).abs().mean() / self.previous_modulated_input.abs().mean()).cpu().item())
-                        if self.accumulated_rel_l1_distance < self.rel_l1_thresh:
-                            self.should_calc = False
-                            self.cache_skipped_steps += 1
+                    if step_no <= skip_steps_cache.start_step or step_no == skip_steps_cache.num_steps-1:
+                        skip_steps_cache.accumulated_rel_l1_distance = 0
+                    else:                         
+                        rescale_func = np.poly1d(skip_steps_cache.coefficients)
+                        skip_steps_cache.accumulated_rel_l1_distance += rescale_func(((modulated_inp-skip_steps_cache.previous_modulated_input).abs().mean() / skip_steps_cache.previous_modulated_input.abs().mean()).cpu().item())
+                        if skip_steps_cache.accumulated_rel_l1_distance < skip_steps_cache.rel_l1_thresh:
+                            skip_steps_cache.should_calc = False
+                            skip_steps_cache.skipped_steps += 1
                         else:
-                            self.accumulated_rel_l1_distance = 0
-                    self.previous_modulated_input = modulated_inp  
-        else:
-            self.should_calc = True
+                            skip_steps_cache.accumulated_rel_l1_distance = 0
+                    skip_steps_cache.previous_modulated_input = modulated_inp  
+            should_calc = skip_steps_cache.should_calc
 
-        if not self.should_calc:
-            img += self.previous_residual[x_id]
+        if not should_calc:
+            img += skip_steps_cache.previous_residual[x_id]
         else:
-            if self.enable_cache:            
-                self.previous_residual[x_id] = None
+            if skip_steps_cache is not None:            
+                skip_steps_cache.previous_residual[x_id] = None
                 ori_img = img[0:1].clone()
             # --------------------- Pass through DiT blocks ------------------------
             for layer_num, block in enumerate(self.double_blocks):
@@ -1076,10 +1077,10 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                     single_block_args = None
 
             # img = x[:, :img_seq_len, ...]
-            if self.enable_cache:
+            if skip_steps_cache is not None:
                 if len(img) > 1:
-                    self.previous_residual[0] = torch.empty_like(img)
-                    for i, (x, residual) in enumerate(zip(img, self.previous_residual[0])):
+                    skip_steps_cache.previous_residual[0] = torch.empty_like(img)
+                    for i, (x, residual) in enumerate(zip(img, skip_steps_cache.previous_residual[0])):
                         if i < len(img) - 1:
                             residual[...] = torch.sub(x, ori_img) 
                         else:
@@ -1087,8 +1088,8 @@ class HYVideoDiffusionTransformer(ModelMixin, ConfigMixin):
                             torch.sub(x, ori_img, out=residual)                     
                     x = None
                 else:
-                    self.previous_residual[x_id] = ori_img
-                    torch.sub(img, ori_img, out=self.previous_residual[x_id]) 
+                    skip_steps_cache.previous_residual[x_id] = ori_img
+                    torch.sub(img, ori_img, out=skip_steps_cache.previous_residual[x_id]) 
 
 
         if ref_length != None:

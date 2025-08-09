@@ -1,6 +1,16 @@
 import torch
 
 class family_handler():
+
+    @staticmethod
+    def set_cache_parameters(cache_type, base_model_type, model_def, inputs, skip_steps_cache):
+        if base_model_type == "sky_df_1.3B":
+            coefficients= [2.39676752e+03, -1.31110545e+03,  2.01331979e+02, -8.29855975e+00, 1.37887774e-01]
+        else: 
+            coefficients= [-5784.54975374,  5449.50911966, -1811.16591783,   256.27178429, -13.02252404]
+
+        skip_steps_cache.coefficients = coefficients
+
     @staticmethod
     def query_model_def(base_model_type, model_def):
         extra_model_def = {}
@@ -13,6 +23,7 @@ class family_handler():
         extra_model_def["frames_steps"] = 20
         extra_model_def["sliding_window"] = True
         extra_model_def["skip_layer_guidance"] = True
+        extra_model_def["tea_cache"] = True
         return extra_model_def 
 
     @staticmethod

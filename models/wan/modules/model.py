@@ -1010,6 +1010,7 @@ class WanModel(ModelMixin, ConfigMixin):
         self._lock_dtype = dtype
 
     def compute_magcache_threshold(self, start_step, timesteps = None, speed_factor =0):
+        skips_step_cache = self.cache
         def nearest_interp(src_array, target_length):
             src_length = len(src_array)
             if target_length == 1: return np.array([src_array[-1]])
@@ -1017,13 +1018,14 @@ class WanModel(ModelMixin, ConfigMixin):
             mapped_indices = np.round(np.arange(target_length) * scale).astype(int)
             return src_array[mapped_indices]
         num_inference_steps = len(timesteps)
-        if len(self.def_mag_ratios) != num_inference_steps*2:
-            mag_ratio_con = nearest_interp(self.def_mag_ratios[0::2], num_inference_steps)
-            mag_ratio_ucon = nearest_interp(self.def_mag_ratios[1::2], num_inference_steps)
+        def_mag_ratios = np.array([1.0]*2+ skips_step_cache.def_mag_ratios)
+        if len(def_mag_ratios) != num_inference_steps*2:
+            mag_ratio_con = nearest_interp(def_mag_ratios[0::2], num_inference_steps)
+            mag_ratio_ucon = nearest_interp(def_mag_ratios[1::2], num_inference_steps)
             interpolated_mag_ratios = np.concatenate([mag_ratio_con.reshape(-1, 1), mag_ratio_ucon.reshape(-1, 1)], axis=1).reshape(-1)
-            self.mag_ratios = interpolated_mag_ratios
+            skips_step_cache.mag_ratios = interpolated_mag_ratios
         else:
-            self.mag_ratios = self.def_mag_ratios
+            skips_step_cache.mag_ratios = def_mag_ratios
 
 
         best_deltas = None
@@ -1044,12 +1046,12 @@ class WanModel(ModelMixin, ConfigMixin):
                 else:
                     x_should_calc = []
                     for cur_x_id in range(x_id_max):
-                        cur_mag_ratio = self.mag_ratios[i * 2 + cur_x_id] # conditional and unconditional in one list
+                        cur_mag_ratio = skips_step_cache.mag_ratios[i * 2 + cur_x_id] # conditional and unconditional in one list
                         accumulated_ratio[cur_x_id] *= cur_mag_ratio # magnitude ratio between current step and the cached step
                         accumulated_steps[cur_x_id] += 1 # skip steps plus 1
                         cur_skip_err = np.abs(1-accumulated_ratio[cur_x_id]) # skip error of current steps
                         accumulated_err[cur_x_id] += cur_skip_err # accumulated error of multiple steps
-                        if accumulated_err[cur_x_id]<threshold and accumulated_steps[cur_x_id]<=self.magcache_K:
+                        if accumulated_err[cur_x_id]<threshold and accumulated_steps[cur_x_id]<=skips_step_cache.magcache_K:
                             skip  = True
                         else:
                             skip  = False
@@ -1066,13 +1068,14 @@ class WanModel(ModelMixin, ConfigMixin):
             elif diff > best_diff:
                 break
             threshold += 0.01
-        self.magcache_thresh = best_threshold
+        skips_step_cache.magcache_thresh = best_threshold
         print(f"Mag Cache, best threshold found:{best_threshold:0.2f} with gain x{len(timesteps)/(target_nb_steps - best_signed_diff):0.2f} for a target of x{speed_factor}")
         return best_threshold
 
     def compute_teacache_threshold(self, start_step, timesteps = None, speed_factor =0): 
+        skips_step_cache = self.cache
         modulation_dtype = self.time_projection[1].weight.dtype
-        rescale_func = np.poly1d(self.coefficients)
+        rescale_func = np.poly1d(skips_step_cache.coefficients)
         e_list = []
         for t in timesteps:
             t = torch.stack([t])
@@ -1112,7 +1115,7 @@ class WanModel(ModelMixin, ConfigMixin):
             elif diff > best_diff:
                 break
             threshold += 0.01
-        self.rel_l1_thresh = best_threshold
+        skips_step_cache.rel_l1_thresh = best_threshold
         print(f"Tea Cache, best threshold found:{best_threshold:0.2f} with gain x{len(timesteps)/(target_nb_steps - best_signed_diff):0.2f} for a target of x{speed_factor}")
         # print(f"deltas:{best_deltas}")
         return best_threshold
@@ -1282,72 +1285,73 @@ class WanModel(ModelMixin, ConfigMixin):
             del c
         should_calc = True
         x_should_calc = None
-        if self.enable_cache != None: 
-            if self.enable_cache == "mag":
-                if current_step <= self.cache_start_step:
+        skips_steps_cache = self.cache
+        if skips_steps_cache != None: 
+            if skips_steps_cache.cache_type == "mag":
+                if current_step <= skips_steps_cache.start_step:
                     should_calc = True
-                elif self.one_for_all and x_id != 0: # not joint pass, not main pas, one for all
+                elif skips_steps_cache.one_for_all and x_id != 0: # not joint pass, not main pas, one for all
                     assert len(x_list) == 1
-                    should_calc = self.should_calc
+                    should_calc = skips_steps_cache.should_calc
                 else:
                     x_should_calc = []
-                    for i in range(1 if self.one_for_all else len(x_list)):
+                    for i in range(1 if skips_steps_cache.one_for_all else len(x_list)):
                         cur_x_id = i if joint_pass else x_id  
-                        cur_mag_ratio = self.mag_ratios[current_step * 2 + cur_x_id] # conditional and unconditional in one list
-                        self.accumulated_ratio[cur_x_id] *= cur_mag_ratio # magnitude ratio between current step and the cached step
-                        self.accumulated_steps[cur_x_id] += 1 # skip steps plus 1
-                        cur_skip_err = np.abs(1-self.accumulated_ratio[cur_x_id]) # skip error of current steps
-                        self.accumulated_err[cur_x_id] += cur_skip_err # accumulated error of multiple steps
-                        if self.accumulated_err[cur_x_id]<self.magcache_thresh and self.accumulated_steps[cur_x_id]<=self.magcache_K:
+                        cur_mag_ratio = skips_steps_cache.mag_ratios[current_step * 2 + cur_x_id] # conditional and unconditional in one list
+                        skips_steps_cache.accumulated_ratio[cur_x_id] *= cur_mag_ratio # magnitude ratio between current step and the cached step
+                        skips_steps_cache.accumulated_steps[cur_x_id] += 1 # skip steps plus 1
+                        cur_skip_err = np.abs(1-skips_steps_cache.accumulated_ratio[cur_x_id]) # skip error of current steps
+                        skips_steps_cache.accumulated_err[cur_x_id] += cur_skip_err # accumulated error of multiple steps
+                        if skips_steps_cache.accumulated_err[cur_x_id]<skips_steps_cache.magcache_thresh and skips_steps_cache.accumulated_steps[cur_x_id]<=skips_steps_cache.magcache_K:
                             skip_forward = True
-                            if i == 0 and x_id == 0: self.cache_skipped_steps += 1
-                            # print(f"skip: step={current_step} for x_id={cur_x_id}, accum error {self.accumulated_err[cur_x_id]}")
+                            if i == 0 and x_id == 0: skips_steps_cache.skipped_steps += 1
+                            # print(f"skip: step={current_step} for x_id={cur_x_id}, accum error {skips_step_cache.accumulated_err[cur_x_id]}")
                         else:
                             skip_forward = False
-                            self.accumulated_err[cur_x_id], self.accumulated_steps[cur_x_id], self.accumulated_ratio[cur_x_id] = 0, 0, 1.0
+                            skips_steps_cache.accumulated_err[cur_x_id], skips_steps_cache.accumulated_steps[cur_x_id], skips_steps_cache.accumulated_ratio[cur_x_id] = 0, 0, 1.0
                         x_should_calc.append(not skip_forward)
-                    if self.one_for_all:
-                        should_calc = self.should_calc = x_should_calc[0] 
+                    if skips_steps_cache.one_for_all:
+                        should_calc = skips_steps_cache.should_calc = x_should_calc[0] 
                         x_should_calc = None
             else:
                 if x_id != 0:
-                    should_calc = self.should_calc
+                    should_calc = skips_steps_cache.should_calc
                 else:
-                    if current_step <= self.cache_start_step or current_step == self.num_steps-1:
+                    if current_step <= skips_steps_cache.start_step or current_step == skips_steps_cache.num_steps-1:
                         should_calc = True
-                        self.accumulated_rel_l1_distance = 0
+                        skips_steps_cache.accumulated_rel_l1_distance = 0
                     else:
-                        rescale_func = np.poly1d(self.coefficients)
-                        delta = abs(rescale_func(((e-self.previous_modulated_input).abs().mean() / self.previous_modulated_input.abs().mean()).cpu().item()))
-                        self.accumulated_rel_l1_distance += delta
-                        if self.accumulated_rel_l1_distance < self.rel_l1_thresh:
+                        rescale_func = np.poly1d(skips_steps_cache.coefficients)
+                        delta = abs(rescale_func(((e-skips_steps_cache.previous_modulated_input).abs().mean() / skips_steps_cache.previous_modulated_input.abs().mean()).cpu().item()))
+                        skips_steps_cache.accumulated_rel_l1_distance += delta
+                        if skips_steps_cache.accumulated_rel_l1_distance < skips_steps_cache.rel_l1_thresh:
                             should_calc = False
-                            self.cache_skipped_steps += 1
-                            # print(f"Teacache Skipped Step no {current_step} ({self.cache_skipped_steps}/{current_step}), delta={delta}" )
+                            skips_steps_cache.skipped_steps += 1
+                            # print(f"Teacache Skipped Step no {current_step} ({skips_step_cache.cache_skipped_steps}/{current_step}), delta={delta}" )
                         else:
                             should_calc = True
-                            self.accumulated_rel_l1_distance = 0
-                    self.previous_modulated_input = e 
-                    self.should_calc = should_calc
+                            skips_steps_cache.accumulated_rel_l1_distance = 0
+                    skips_steps_cache.previous_modulated_input = e 
+                    skips_steps_cache.should_calc = should_calc
 
         if x_should_calc  == None: x_should_calc = [should_calc] * len(x_list) 
 
         if joint_pass:
             for i, x in enumerate(x_list):
-                if not x_should_calc[i]: x += self.previous_residual[i]
+                if not x_should_calc[i]: x += skips_steps_cache.previous_residual[i]
         elif not x_should_calc[0]:
             x = x_list[0]
-            x += self.previous_residual[x_id]
+            x += skips_steps_cache.previous_residual[x_id]
         x = None
 
-        if self.enable_cache != None:
-            if self.previous_residual == None: self.previous_residual = [ None ] * len(self.previous_residual)
-
+        if skips_steps_cache != None:
+            if skips_steps_cache.previous_residual == None: skips_steps_cache.previous_residual = [ None ] * len(x_list)
+    
             if joint_pass:
                 for i, should_calc in enumerate(x_should_calc):
-                    if should_calc: self.previous_residual[i] = None
+                    if should_calc: skips_steps_cache.previous_residual[i] = None
             elif x_should_calc[0]:
-                self.previous_residual[x_id] = None
+                skips_steps_cache.previous_residual[x_id] = None
             ori_hidden_states = [ None ] * len(x_list)
             if all(x_should_calc):
                 ori_hidden_states[0] = x_list[0].clone()
@@ -1379,27 +1383,27 @@ class WanModel(ModelMixin, ConfigMixin):
                             del x
                     context = hints = audio_embedding  = None
 
-        if self.enable_cache != None:
+        if skips_steps_cache != None:
             if joint_pass:
                 if all(x_should_calc):                        
                     for i, (x, ori, is_source) in enumerate(zip(x_list, ori_hidden_states, is_source_x)) :
                         if i == 0 or is_source and i != last_x_idx  :
-                            self.previous_residual[i] = torch.sub(x, ori) 
+                            skips_steps_cache.previous_residual[i] = torch.sub(x, ori) 
                         else:
-                            self.previous_residual[i] = ori
-                            torch.sub(x, ori, out=self.previous_residual[i]) 
+                            skips_steps_cache.previous_residual[i] = ori
+                            torch.sub(x, ori, out=skips_steps_cache.previous_residual[i]) 
                         ori_hidden_states[i] = None
                 else:
                     for i, (x, ori, is_source, should_calc) in enumerate(zip(x_list, ori_hidden_states, is_source_x, x_should_calc)) :
                         if should_calc:
-                            self.previous_residual[i] = ori
-                            torch.sub(x, ori, out=self.previous_residual[i]) 
+                            skips_steps_cache.previous_residual[i] = ori
+                            torch.sub(x, ori, out=skips_steps_cache.previous_residual[i]) 
                         ori_hidden_states[i] = None
                 x , ori = None, None
             elif x_should_calc[0]:
                 residual = ori_hidden_states[0] # just to have a readable code
                 torch.sub(x_list[0], ori_hidden_states[0], out=residual)
-                self.previous_residual[x_id] = residual
+                skips_steps_cache.previous_residual[x_id] = residual
             residual, ori_hidden_states = None, None
 
         for i, x in enumerate(x_list):

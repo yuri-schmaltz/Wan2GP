@@ -102,6 +102,8 @@ class model_factory():
             self.vae.tile_latent_min_height  = VAE_tile_size[1] 
             self.vae.tile_latent_min_width  = VAE_tile_size[1]
 
+
+        self.vae.enable_slicing()
         # width, height = aspect_ratios["16:9"]
 
         if n_prompt is None or len(n_prompt) == 0:

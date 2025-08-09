@@ -313,21 +313,24 @@ class DTT2V:
         if callback != None:
             update_loras_slists(self.model, loras_slists, updated_num_steps)
             callback(-1, None, True, override_num_inference_steps = updated_num_steps)
-        if self.model.enable_cache == "tea":
-            x_count = 2 if self.do_classifier_free_guidance else 1
-            self.model.previous_residual = [None] * x_count 
-            time_steps_comb = []
-            self.model.num_steps = updated_num_steps
-            for i, timestep_i in enumerate(step_matrix):
-                valid_interval_start, valid_interval_end = valid_interval[i]
-                timestep = timestep_i[None, valid_interval_start:valid_interval_end].clone()
-                if overlap_noise > 0 and valid_interval_start < predix_video_latent_length:
-                    timestep[:, valid_interval_start:predix_video_latent_length] = overlap_noise
-                time_steps_comb.append(timestep)
-            self.model.compute_teacache_threshold(self.model.cache_start_step, time_steps_comb, self.model.cache_multiplier)
-            del time_steps_comb
-        else:
-            self.model.enable_cache = None
+        skip_steps_cache = self.model.cache
+        if skip_steps_cache != None:
+            skip_steps_cache.num_steps = updated_num_steps
+            if skip_steps_cache.cache_type == "tea":
+                x_count = 2 if self.do_classifier_free_guidance else 1
+                skip_steps_cache.previous_residual = [None] * x_count 
+                time_steps_comb = []
+                skip_steps_cache.steps = updated_num_steps
+                for i, timestep_i in enumerate(step_matrix):
+                    valid_interval_start, valid_interval_end = valid_interval[i]
+                    timestep = timestep_i[None, valid_interval_start:valid_interval_end].clone()
+                    if overlap_noise > 0 and valid_interval_start < predix_video_latent_length:
+                        timestep[:, valid_interval_start:predix_video_latent_length] = overlap_noise
+                    time_steps_comb.append(timestep)
+                self.model.compute_teacache_threshold(skip_steps_cache.start_step, time_steps_comb, skip_steps_cache.multiplier)
+                del time_steps_comb
+            else:
+                self.model.cache = None
         from mmgp import offload
         freqs = get_rotary_pos_embed(latents.shape[2 :], enable_RIFLEx= False) 
         kwrags = {

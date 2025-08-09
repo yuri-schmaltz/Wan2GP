@@ -9,6 +9,25 @@ def get_hunyuan_text_encoder_filename(text_encoder_quantization):
     return text_encoder_filename
 
 class family_handler():
+
+    @staticmethod
+    def set_cache_parameters(cache_type, base_model_type, model_def, inputs, skip_steps_cache):
+        resolution = inputs["resolution"]
+        width, height = resolution.split("x")
+        pixels = int(width) * int(height)
+
+        if cache_type == "mag":
+            skip_steps_cache.update({     
+            "magcache_thresh" : 0,
+            "magcache_K" : 2,
+            })
+            if pixels >= 1280* 720:
+                skip_steps_cache.def_mag_ratios = [1.0754, 1.27807, 1.11596, 1.09504, 1.05188, 1.00844, 1.05779, 1.00657, 1.04142, 1.03101, 1.00679, 1.02556, 1.00908, 1.06949, 1.05438, 1.02214, 1.02321, 1.03019, 1.00779, 1.03381, 1.01886, 1.01161, 1.02968, 1.00544, 1.02822, 1.00689, 1.02119, 1.0105, 1.01044, 1.01572, 1.02972, 1.0094, 1.02368, 1.0226, 0.98965, 1.01588, 1.02146, 1.0018, 1.01687, 0.99436, 1.00283, 1.01139, 0.97122, 0.98251, 0.94513, 0.97656, 0.90943, 0.85703, 0.75456]
+            else:
+                skip_steps_cache.def_mag_ratios = [1.06971, 1.29073, 1.11245, 1.09596, 1.05233, 1.01415, 1.05672, 1.00848, 1.03632, 1.02974, 1.00984, 1.03028, 1.00681, 1.06614, 1.05022, 1.02592, 1.01776, 1.02985, 1.00726, 1.03727, 1.01502, 1.00992, 1.03371, 0.9976, 1.02742, 1.0093, 1.01869, 1.00815, 1.01461, 1.01152, 1.03082, 1.0061, 1.02162, 1.01999, 0.99063, 1.01186, 1.0217, 0.99947, 1.01711, 0.9904, 1.00258, 1.00878, 0.97039, 0.97686, 0.94315, 0.97728, 0.91154, 0.86139, 0.76592]
+        else:
+            skip_steps_cache.coefficients = [7.33226126e+02, -4.01131952e+02,  6.75869174e+01, -3.14987800e+00, 9.61237896e-02]
+
     @staticmethod
     def query_model_def(base_model_type, model_def):
         extra_model_def = {}
@@ -25,7 +44,8 @@ class family_handler():
         extra_model_def["sliding_window"] = False
         extra_model_def["embedded_guidance"] = base_model_type in ["hunyuan", "hunyuan_i2v"]
         extra_model_def["cfg_star"] =  base_model_type in [ "hunyuan_avatar", "hunyuan_custom_audio", "hunyuan_custom_edit", "hunyuan_custom"]
-        extra_model_def["skip_steps_cache"] = True
+        extra_model_def["tea_cache"] = True
+        extra_model_def["mag_cache"] = True
         return extra_model_def
 
     @staticmethod

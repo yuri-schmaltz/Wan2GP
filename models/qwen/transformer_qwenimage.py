@@ -467,6 +467,16 @@ class QwenImageTransformer2DModel(nn.Module):
     _no_split_modules = ["QwenImageTransformerBlock"]
     _skip_layerwise_casting_patterns = ["pos_embed", "norm"]
 
+
+    def preprocess_loras(self, model_type, sd):
+        new_sd = {}
+        for k,v in sd.items():
+            if k.startswith("transformer_blocks"):
+                k = "diffusion_model." + k
+                new_sd[k] = v
+        sd = new_sd  
+        return sd
+
     def __init__(
         self,
         patch_size: int = 2,

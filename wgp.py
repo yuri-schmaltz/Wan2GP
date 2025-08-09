@@ -177,7 +177,7 @@ def process_prompt_and_add_tasks(state, model_choice):
         return get_queue_table(queue)
     model_def = get_model_def(model_type)
     image_outputs = inputs["image_mode"] == 1
-    any_steps_skipping = model_def.get("skip_steps_cache", False)
+    any_steps_skipping = model_def.get("tea_cache", False) or model_def.get("mag_cache", False)
     model_type = get_base_model_type(model_type)
     inputs["model_filename"] = model_filename
     
@@ -302,16 +302,10 @@ def process_prompt_and_add_tasks(state, model_choice):
             return
 
     if not any_steps_skipping: skip_steps_cache_type = ""
-    if switch_threshold is not None and switch_threshold != 0 and len(skip_steps_cache_type) > 0:
-        gr.Info("Steps skipping is not yet supported if Switch Threshold is not null")
-        return
     if not model_def.get("lock_inference_steps", False) and model_type in ["ltxv_13B"] and num_inference_steps < 20:
         gr.Info("The minimum number of steps should be 20") 
         return
     if skip_steps_cache_type == "mag":
-        if model_type in  ["sky_df_1.3B", "sky_df_14B"]:
-            gr.Info("Mag Cache is not supported with Diffusion Forcing")
-            return
         if num_inference_steps > 50:
             gr.Info("Mag Cache maximum number of steps is 50")
             return
@@ -3844,6 +3838,36 @@ def get_transformer_loras(model_type):
     transformer_loras_multipliers = transformer_loras_multipliers[:len(transformer_loras_filenames)]
     return transformer_loras_filenames, transformer_loras_multipliers
 
+class DynamicClass:
+    def __init__(self, **kwargs):
+        self._data = {}
+        # Preassign default properties from kwargs
+        for key, value in kwargs.items():
+            self._data[key] = value
+    
+    def __getattr__(self, name):
+        if name in self._data:
+            return self._data[name]
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+    
+    def __setattr__(self, name, value):
+        if name.startswith('_'):
+            super().__setattr__(name, value)
+        else:
+            if not hasattr(self, '_data'):
+                super().__setattr__('_data', {})
+            self._data[name] = value
+    
+    def assign(self, **kwargs):
+        """Assign multiple properties at once"""
+        for key, value in kwargs.items():
+            self._data[key] = value
+        return self  # For method chaining
+    
+    def update(self, dict):
+        """Alias for assign() - more dict-like"""
+        return self.assign(**dict)
+
 def generate_video(
     task,
     send_cmd,
@@ -3999,7 +4023,6 @@ def generate_video(
     
     width, height = resolution.split("x")
     width, height = int(width), int(height)
-    resolution_reformated = str(height) + "*" + str(width) 
     default_image_size = (height, width)
 
     if slg_switch == 0:
@@ -4137,50 +4160,26 @@ def generate_video(
             update_task_thumbnails(task, locals())
             send_cmd("output")
     joint_pass = boost ==1 #and profile != 1 and profile != 3  
-    trans.enable_cache = None if len(skip_steps_cache_type) == 0 else skip_steps_cache_type
-    if trans2 is not None:
-        trans2.enable_cache = None
+    
+    skip_steps_cache = None if len(skip_steps_cache_type) == 0 else DynamicClass(cache_type = skip_steps_cache_type) 
 
-    if trans.enable_cache != None:
-        trans.cache_multiplier = skip_steps_multiplier
-        trans.cache_start_step =  int(skip_steps_start_step_perc*num_inference_steps/100)
-
-    if trans.enable_cache == "mag":
-        trans.magcache_thresh = 0
-        trans.magcache_K = 2
-        def_mag_ratios = model_def.get("magcache_ratios", None) if model_def != None else None
-        if def_mag_ratios != None:
-            trans.def_mag_ratios = def_mag_ratios
-        elif get_model_family(model_type) == "wan":
-            if i2v:
-                trans.def_mag_ratios = np.array([1.0]*2+[1.0124, 1.02213, 1.00166, 1.0041, 0.99791, 1.00061, 0.99682, 0.99762, 0.99634, 0.99685, 0.99567, 0.99586, 0.99416, 0.99422, 0.99578, 0.99575, 0.9957, 0.99563, 0.99511, 0.99506, 0.99535, 0.99531, 0.99552, 0.99549, 0.99541, 0.99539, 0.9954, 0.99536, 0.99489, 0.99485, 0.99518, 0.99514, 0.99484, 0.99478, 0.99481, 0.99479, 0.99415, 0.99413, 0.99419, 0.99416, 0.99396, 0.99393, 0.99388, 0.99386, 0.99349, 0.99349, 0.99309, 0.99304, 0.9927, 0.9927, 0.99228, 0.99226, 0.99171, 0.9917, 0.99137, 0.99135, 0.99068, 0.99063, 0.99005, 0.99003, 0.98944, 0.98942, 0.98849, 0.98849, 0.98758, 0.98757, 0.98644, 0.98643, 0.98504, 0.98503, 0.9836, 0.98359, 0.98202, 0.98201, 0.97977, 0.97978, 0.97717, 0.97718, 0.9741, 0.97411, 0.97003, 0.97002, 0.96538, 0.96541, 0.9593, 0.95933, 0.95086, 0.95089, 0.94013, 0.94019, 0.92402, 0.92414, 0.90241, 0.9026, 0.86821, 0.86868, 0.81838, 0.81939])#**(0.5)# In our papaer, we utilize the sqrt to smooth the ratio, which has little impact on the performance and can be deleted.
-            else:
-                trans.def_mag_ratios = np.array([1.0]*2+[1.02504, 1.03017, 1.00025, 1.00251, 0.9985, 0.99962, 0.99779, 0.99771, 0.9966, 0.99658, 0.99482, 0.99476, 0.99467, 0.99451, 0.99664, 0.99656, 0.99434, 0.99431, 0.99533, 0.99545, 0.99468, 0.99465, 0.99438, 0.99434, 0.99516, 0.99517, 0.99384, 0.9938, 0.99404, 0.99401, 0.99517, 0.99516, 0.99409, 0.99408, 0.99428, 0.99426, 0.99347, 0.99343, 0.99418, 0.99416, 0.99271, 0.99269, 0.99313, 0.99311, 0.99215, 0.99215, 0.99218, 0.99215, 0.99216, 0.99217, 0.99163, 0.99161, 0.99138, 0.99135, 0.98982, 0.9898, 0.98996, 0.98995, 0.9887, 0.98866, 0.98772, 0.9877, 0.98767, 0.98765, 0.98573, 0.9857, 0.98501, 0.98498, 0.9838, 0.98376, 0.98177, 0.98173, 0.98037, 0.98035, 0.97678, 0.97677, 0.97546, 0.97543, 0.97184, 0.97183, 0.96711, 0.96708, 0.96349, 0.96345, 0.95629, 0.95625, 0.94926, 0.94929, 0.93964, 0.93961, 0.92511, 0.92504, 0.90693, 0.90678, 0.8796, 0.87945, 0.86111, 0.86189])
+    if skip_steps_cache != None:
+        skip_steps_cache.update({     
+        "multiplier" : skip_steps_multiplier,
+        "start_step":  int(skip_steps_start_step_perc*num_inference_steps/100)
+        })
+        model_handler.set_cache_parameters(skip_steps_cache_type, base_model_type, model_def, locals(), skip_steps_cache)
+        if skip_steps_cache_type == "mag":
+            def_mag_ratios = model_def.get("magcache_ratios", None) if model_def != None else None
+            if def_mag_ratios is not None: skip_steps_cache.def_mag_ratios = def_mag_ratios
+        elif skip_steps_cache_type == "tea":
+            def_tea_coefficients = model_def.get("teacache_coefficients", None) if model_def != None else None
+            if def_tea_coefficients is not None: skip_steps_cache.coefficients = def_tea_coefficients
         else:
-            if width * height >= 1280* 720:
-                trans.def_mag_ratios = np.array([1.0]+[1.0754, 1.27807, 1.11596, 1.09504, 1.05188, 1.00844, 1.05779, 1.00657, 1.04142, 1.03101, 1.00679, 1.02556, 1.00908, 1.06949, 1.05438, 1.02214, 1.02321, 1.03019, 1.00779, 1.03381, 1.01886, 1.01161, 1.02968, 1.00544, 1.02822, 1.00689, 1.02119, 1.0105, 1.01044, 1.01572, 1.02972, 1.0094, 1.02368, 1.0226, 0.98965, 1.01588, 1.02146, 1.0018, 1.01687, 0.99436, 1.00283, 1.01139, 0.97122, 0.98251, 0.94513, 0.97656, 0.90943, 0.85703, 0.75456])
-            else:
-                trans.def_mag_ratios = np.array([1.0]+[1.06971, 1.29073, 1.11245, 1.09596, 1.05233, 1.01415, 1.05672, 1.00848, 1.03632, 1.02974, 1.00984, 1.03028, 1.00681, 1.06614, 1.05022, 1.02592, 1.01776, 1.02985, 1.00726, 1.03727, 1.01502, 1.00992, 1.03371, 0.9976, 1.02742, 1.0093, 1.01869, 1.00815, 1.01461, 1.01152, 1.03082, 1.0061, 1.02162, 1.01999, 0.99063, 1.01186, 1.0217, 0.99947, 1.01711, 0.9904, 1.00258, 1.00878, 0.97039, 0.97686, 0.94315, 0.97728, 0.91154, 0.86139, 0.76592])
+            raise Exception(f"unknown cache type {skip_steps_cache_type}")
+    trans.cache = skip_steps_cache
+    if trans2 is not None: trans2.cache = skip_steps_cache
 
-    elif trans.enable_cache == "tea":
-        trans.rel_l1_thresh = 0
-        model_def = get_model_def(model_type)        
-        def_tea_coefficients = model_def.get("teacache_coefficients", None) if model_def != None else None
-        if def_tea_coefficients != None:
-            trans.coefficients = def_tea_coefficients
-        elif get_model_family(model_type) == "wan":
-            if i2v:
-                if '720p' in model_filename:
-                    trans.coefficients = [-114.36346466,   65.26524496,  -18.82220707,    4.91518089,   -0.23412683]
-                else:
-                    trans.coefficients = [-3.02331670e+02,  2.23948934e+02, -5.25463970e+01,  5.87348440e+00, -2.01973289e-01]
-            else:
-                if '1.3B' in model_filename:
-                    trans.coefficients = [2.39676752e+03, -1.31110545e+03,  2.01331979e+02, -8.29855975e+00, 1.37887774e-01]
-                elif '14B' in model_filename:
-                    trans.coefficients = [-5784.54975374,  5449.50911966, -1811.16591783,   256.27178429, -13.02252404]
-                else:
-                        raise gr.Error("Teacache not supported for this model")
     output_new_audio_data = None
     output_new_audio_filepath = None
     original_audio_guide = audio_guide
@@ -4502,12 +4501,13 @@ def generate_video(
             progress_args = [0, merge_status_context(status, "Encoding Prompt")]
             send_cmd("progress", progress_args)
 
-            if trans.enable_cache !=  None:
-                trans.num_steps = num_inference_steps                
-                trans.cache_skipped_steps = 0    
-                trans.previous_residual = None
-                trans.previous_modulated_input = None
-
+            if skip_steps_cache !=  None:
+                skip_steps_cache.update({
+                "num_steps" : num_inference_steps,                
+                "skipped_steps" : 0,
+                "previous_residual": None,
+                "previous_modulated_input":  None,
+                })
             # samples = torch.empty( (1,2)) #for testing
             # if False:
             
@@ -4580,8 +4580,12 @@ def generate_video(
                     cleanup_temp_audio_files(control_audio_tracks + source_audio_tracks)
                 remove_temp_filenames(temp_filenames_list)
                 offloadobj.unload_all()
+                trans.cache = None 
                 offload.unload_loras_from_model(trans)
-                if trans is not None: offload.unload_loras_from_model(trans) 
+                if trans2 is not None: 
+                    trans2.cache = None 
+                    offload.unload_loras_from_model(trans2)
+                skip_steps_cache = None
                 # if compile:
                 #     cache_size = torch._dynamo.config.cache_size_limit                                      
                 #     torch.compiler.reset()
@@ -4608,12 +4612,11 @@ def generate_video(
                 send_cmd("error", new_error)
                 clear_status(state)
                 return
-            finally:
-                trans.previous_residual = None
-                trans.previous_modulated_input = None
 
-            if trans.enable_cache != None :
-                print(f"Skipped Steps:{trans.cache_skipped_steps}/{trans.num_steps}" )
+            if skip_steps_cache != None :
+                skip_steps_cache.previous_residual = None
+                skip_steps_cache.previous_modulated_input = None
+                print(f"Skipped Steps:{skip_steps_cache.skipped_steps}/{skip_steps_cache.num_steps}" )
 
             if samples != None:
                 if isinstance(samples, dict):
@@ -4797,8 +4800,10 @@ def generate_video(
 
         seed = set_seed(-1)
     clear_status(state)
+    trans.cache = None
     offload.unload_loras_from_model(trans)
     if not trans2 is None:
+        trans2.cache = None
         offload.unload_loras_from_model(trans2)
 
     if len(control_audio_tracks) > 0 or len(source_audio_tracks) > 0:
@@ -5523,7 +5528,7 @@ def prepare_inputs_dict(target, inputs, model_type = None, model_filename = None
     if not model_def.get("embedded_guidance", False) or model_def.get("no_guidance", False):
         pop += ["embedded_guidance_scale"]
 
-    if not model_def.get("skip_steps_cache", False) :
+    if not (model_def.get("tea_cache", False) or model_def.get("mag_cache", False)) :
         pop += ["skip_steps_cache_type", "skip_steps_multiplier", "skip_steps_start_step_perc"]
 
     if model_def.get("no_guidance", False) :
@@ -6496,7 +6501,8 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             ltxv = "ltxv" in model_filename 
             lock_inference_steps = model_def.get("lock_inference_steps", False)
             model_reference_image = model_def.get("reference_image", False)
-            any_steps_skipping = model_def.get("skip_steps_cache", False)
+            any_tea_cache = model_def.get("tea_cache", False)
+            any_mag_cache = model_def.get("mag_cache", False)
             recammaster = base_model_type in ["recam_1.3B"]
             vace = test_vace_module(base_model_type)
             phantom = base_model_type in ["phantom_1.3B", "phantom_14B"]
@@ -6988,18 +6994,16 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                             label="Activated Loras"
                         )
                         loras_multipliers = gr.Textbox(label="Loras Multipliers (1.0 by default) separated by Space chars or CR, lines that start with # are ignored", value=launch_multis_str)
-                with gr.Tab("Steps Skipping", visible = any_steps_skipping) as speed_tab:
+                with gr.Tab("Steps Skipping", visible = any_tea_cache or any_mag_cache) as speed_tab:
                     with gr.Column():
                         gr.Markdown("<B>Tea Cache and Mag Cache accelerate the Video Generation by skipping intelligently some steps, the more steps are skipped the lower the quality of the video.</B>")
                         gr.Markdown("<B>Steps Skipping  consumes also VRAM. It is recommended not to skip at least the first 10% steps.</B>")
-
+                        steps_skipping_choices = [("None", "")]
+                        if any_tea_cache: steps_skipping_choices += [("Tea Cache", "tea")]
+                        if any_mag_cache: steps_skipping_choices += [("Mag Cache", "mag")]
                         skip_steps_cache_type = gr.Dropdown(
-                            choices=[
-                                ("None", ""),
-                                ("Tea Cache", "tea"),
-                                ("Mag Cache", "mag"),
-                            ],
-                            value=ui_defaults.get("skip_steps_cache_type",""),
+                            choices= steps_skipping_choices,
+                            value="" if not (any_tea_cache or any_mag_cache) else ui_defaults.get("skip_steps_cache_type",""),
                             visible=True,
                             label="Skip Steps Cache Type"
                         )
