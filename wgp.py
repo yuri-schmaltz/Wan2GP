@@ -3988,11 +3988,9 @@ def generate_video(
     overridden_attention = get_overridden_attention(model_type)
     # if overridden_attention is not None and overridden_attention !=  attention_mode: print(f"Attention mode has been overriden to {overridden_attention} for model type '{model_type}'")
     attn = overridden_attention if overridden_attention is not None else attention_mode
-    if attention_mode == "auto":
+    if attn == "auto":
         attn = get_auto_attention()
-    elif attention_mode in attention_modes_supported:
-        attn = attention_mode
-    else:
+    elif not attn in attention_modes_supported:
         send_cmd("info", f"You have selected attention mode '{attention_mode}'. However it is not installed or supported on your system. You should either install it or switch to the default 'sdpa' attention.")
         send_cmd("exit")
         return
