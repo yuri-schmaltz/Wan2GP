@@ -40,7 +40,7 @@ def get_relative_pose(cam_params):
 def get_camera_embedding(cam_type, num_frames=81):
 
     # load camera
-    tgt_camera_path = "wan/camera_extrinsics.json"
+    tgt_camera_path = "models/wan/camera_extrinsics.json"
     with open(tgt_camera_path, 'r') as file:
         cam_data = json.load(file)
 

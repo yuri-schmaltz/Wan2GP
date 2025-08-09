@@ -23,7 +23,7 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 ### August 8 2025: WanGP v7.74 - Qwen Rebirth part 2
 Added support for Qwen Lightning lora for a 8 steps generation (https://huggingface.co/lightx2v/Qwen-Image-Lightning/blob/main/Qwen-Image-Lightning-8steps-V1.0.safetensors). Lora is not normalized and you can use a multiplier around 0.1.
 
-Mag Cache support for all the Wan2.2 models
+Mag Cache support for all the Wan2.2 models Don't forget to set guidance to 1 and 8 denoising steps , your gen will be 7x faster !
 
 ### August 8 2025: WanGP v7.73 - Qwen Rebirth
 Ever wondered what impact not using Guidance has on a model that expects it ? Just look at Qween Image in WanGP 7.71 whose outputs were erratic. Somehow I had convinced myself that Qwen was a distilled model. In fact Qwen was dying for a negative prompt. And in WanGP 7.72 there is at last one for him.
