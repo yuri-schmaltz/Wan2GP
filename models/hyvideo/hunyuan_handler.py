@@ -72,7 +72,7 @@ class family_handler():
         return {"hunyuan":(20, "Hunyuan Video")}
 
     @staticmethod
-    def get_rgb_factors(model_type):
+    def get_rgb_factors(base_model_type ):
         from shared.RGB_factors import get_rgb_factors
         latent_rgb_factors, latent_rgb_factors_bias = get_rgb_factors("hunyuan")
         return latent_rgb_factors, latent_rgb_factors_bias

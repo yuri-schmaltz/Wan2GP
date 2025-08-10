@@ -504,7 +504,6 @@ class T5EncoderModel:
         else:
             self.model.to(self.device)
         # init tokenizer
-        tokenizer_path= "google/umt5-xxl"
         self.tokenizer = HuggingfaceTokenizer(
             name=tokenizer_path, seq_len=text_len, clean='whitespace')
 

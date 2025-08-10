@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 def test_class_i2v(base_model_type):    
-    return base_model_type in ["i2v", "i2v_2_2", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy",  "multitalk",  ] #"hunyuan_i2v",
+    return base_model_type in ["i2v", "i2v_2_2", "fun_inp_1.3B", "fun_inp", "flf2v_720p",  "fantasy",  "multitalk", "i2v_2_2_multitalk" ] #"hunyuan_i2v",
 
 def test_class_1_3B(base_model_type):    
     return base_model_type in [ "vace_1.3B", "t2v_1.3B", "recam_1.3B","phantom_1.3B","fun_inp_1.3B"]
@@ -79,7 +79,7 @@ class family_handler():
             extra_model_def["no_steps_skipping"] = True
         i2v =  test_class_i2v(base_model_type)
         extra_model_def["i2v_class"] = i2v
-
+        extra_model_def["multitalk_class"] = base_model_type in ["multitalk", "vace_multitalk_14B", "i2v_2_2_multitalk"]
         vace_class = base_model_type in ["vace_14B", "vace_1.3B", "vace_multitalk_14B"] 
         extra_model_def["vace_class"] = vace_class
 
@@ -118,7 +118,7 @@ class family_handler():
         return ["multitalk", "fantasy", "vace_14B", "vace_multitalk_14B",
                     "t2v_1.3B", "t2v", "vace_1.3B", "phantom_1.3B", "phantom_14B", 
                     "recam_1.3B", 
-                    "i2v", "i2v_2_2", "ti2v_2_2", "flf2v_720p", "fun_inp_1.3B", "fun_inp"]
+                    "i2v", "i2v_2_2", "i2v_2_2_multitalk", "ti2v_2_2", "flf2v_720p", "fun_inp_1.3B", "fun_inp"]
 
 
     @staticmethod
@@ -133,6 +133,7 @@ class family_handler():
                     "vace_14B" : [ "vace_multitalk_14B"],
                     "t2v" : [ "vace_14B", "vace_1.3B" "vace_multitalk_14B", "t2v_1.3B", "phantom_1.3B","phantom_14B"],
                     "i2v" : [ "fantasy", "multitalk", "flf2v_720p" ],
+                    "i2v_2_2" : ["i2v_2_2_multitalk"],
                     "fantasy": ["multitalk"],
                     }
         return models_eqv_map, models_comp_map
@@ -150,9 +151,9 @@ class family_handler():
         return 32 if base_model_type == "ti2v_2_2" else 16
 
     @staticmethod
-    def get_rgb_factors(model_type):
+    def get_rgb_factors(base_model_type ):
         from shared.RGB_factors import get_rgb_factors
-        if model_type == "ti2v_2_2": return None, None
+        if base_model_type == "ti2v_2_2": return None, None
         latent_rgb_factors, latent_rgb_factors_bias = get_rgb_factors("wan")
         return latent_rgb_factors, latent_rgb_factors_bias
     

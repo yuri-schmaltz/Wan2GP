@@ -10,7 +10,7 @@ t2v_1_3B.update(wan_shared_cfg)
 
 # t5
 t2v_1_3B.t5_checkpoint = 'models_t5_umt5-xxl-enc-bf16.pth'
-t2v_1_3B.t5_tokenizer = 'google/umt5-xxl'
+t2v_1_3B.t5_tokenizer = 'umt5-xxl'
 
 # vae
 t2v_1_3B.vae_checkpoint = 'Wan2.1_VAE.pth'

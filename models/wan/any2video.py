@@ -87,17 +87,17 @@ class WanAny2V:
             dtype=config.t5_dtype,
             device=torch.device('cpu'),
             checkpoint_path=text_encoder_filename,
-            tokenizer_path=os.path.join(checkpoint_dir, config.t5_tokenizer),
+            tokenizer_path=os.path.join(checkpoint_dir, "umt5-xxl"),
             shard_fn= None)
 
         # base_model_type = "i2v2_2"
-        if hasattr(config, "clip_checkpoint") and not base_model_type in ["i2v_2_2"]:
+        if hasattr(config, "clip_checkpoint") and not base_model_type in ["i2v_2_2", "i2v_2_2_multitalk"]:
             self.clip = CLIPModel(
                 dtype=config.clip_dtype,
                 device=self.device,
                 checkpoint_path=os.path.join(checkpoint_dir , 
                                             config.clip_checkpoint),
-                tokenizer_path=os.path.join(checkpoint_dir ,  config.clip_tokenizer))
+                tokenizer_path=os.path.join(checkpoint_dir ,  "clip_vit_large_patch14"))
 
 
         if base_model_type in ["ti2v_2_2"]:
@@ -495,7 +495,7 @@ class WanAny2V:
         vace = model_type in ["vace_1.3B","vace_14B", "vace_multitalk_14B"]
         phantom = model_type in ["phantom_1.3B", "phantom_14B"]
         fantasy = model_type in ["fantasy"]
-        multitalk = model_type in ["multitalk", "vace_multitalk_14B"]
+        multitalk = model_type in ["multitalk", "vace_multitalk_14B", "i2v_2_2_multitalk"]
         recam = model_type in ["recam_1.3B"]
         ti2v = model_type in ["ti2v_2_2"]
         start_step_no = 0
@@ -505,7 +505,7 @@ class WanAny2V:
         timestep_injection = False
         lat_frames = int((frame_num - 1) // self.vae_stride[0]) + 1
         # image2video 
-        if model_type in ["i2v", "i2v_2_2", "fun_inp_1.3B", "fun_inp", "fantasy", "multitalk", "flf2v_720p"]:
+        if model_type in ["i2v", "i2v_2_2", "fun_inp_1.3B", "fun_inp", "fantasy", "multitalk", "i2v_2_2_multitalk", "flf2v_720p"]:
             any_end_frame = False
             if image_start is None:
                 _ , preframes_count, height, width = input_video.shape

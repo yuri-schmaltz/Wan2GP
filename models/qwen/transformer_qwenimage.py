@@ -469,13 +469,20 @@ class QwenImageTransformer2DModel(nn.Module):
 
 
     def preprocess_loras(self, model_type, sd):
-        new_sd = {}
-        for k,v in sd.items():
-            if k.startswith("transformer_blocks"):
-                k = "diffusion_model." + k
-                new_sd[k] = v
-        sd = new_sd  
-        return sd
+
+        first = next(iter(sd), None)
+        if first == None:
+            return sd
+        if first.startswith("transformer_blocks"):
+            new_sd = {}
+            for k,v in sd.items():
+                if k.startswith("transformer_blocks"):
+                    k = "diffusion_model." + k
+                    new_sd[k] = v
+            sd = new_sd  
+            return sd
+        else:
+            return sd
 
     def __init__(
         self,

@@ -44,13 +44,16 @@ from preprocessing.matanyone  import app as matanyone_app
 from tqdm import tqdm
 import requests
 
+# import torch._dynamo as dynamo
+# dynamo.config.recompile_limit = 2000   # default is 256
+# dynamo.config.accumulated_recompile_limit = 2000  # or whatever limit you want
 
 global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
-target_mmgp_version = "3.5.7"
-WanGP_version = "7.74"
+target_mmgp_version = "3.5.8"
+WanGP_version = "7.75"
 settings_version = 2.23
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -1616,7 +1619,8 @@ def _parse_args():
 
 def get_lora_dir(model_type):
     model_family = get_model_family(model_type)
-    i2v = test_class_i2v(model_type) and not get_base_model_type(model_type) == "i2v_2_2"
+    base_model_type = get_base_model_type(model_type)
+    i2v = test_class_i2v(model_type) and  base_model_type == "i2v_2_2"
     if model_family == "wan":
         lora_dir =args.lora_dir
         if i2v and len(lora_dir)==0:
@@ -1629,7 +1633,7 @@ def get_lora_dir(model_type):
             lora_dir_1_3B = os.path.join(root_lora_dir, "1.3B")
             if os.path.isdir(lora_dir_1_3B ):
                 return lora_dir_1_3B
-        elif model_type == "ti2v_2_2":
+        elif base_model_type == "ti2v_2_2":
             lora_dir_5B = os.path.join(root_lora_dir, "5B")
             if os.path.isdir(lora_dir_5B ):
                 return lora_dir_5B
@@ -3641,7 +3645,7 @@ def perform_spatial_upsampling(sample, spatial_upsampling):
 
 def any_audio_track(model_type):
     base_model_type = get_base_model_type(model_type)
-    return base_model_type in ["fantasy", "multitalk", "hunyuan_avatar", "hunyuan_custom_audio", "vace_multitalk_14B"]
+    return base_model_type in ["fantasy", "hunyuan_avatar", "hunyuan_custom_audio"] or get_model_def(model_type).get("multitalk_class", False)
 
 def get_available_filename(target_path, video_source, suffix = "", force_extension = None):
     name, extension =  os.path.splitext(os.path.basename(video_source))
@@ -3950,7 +3954,13 @@ def generate_video(
     model_filename,
     mode,
 ):
-    
+    # import os
+    # os.environ.pop("TORCH_LOGS", None)  # make sure no env var is suppressing/overriding
+    # import torch._logging as tlog
+    # tlog.set_logs(recompiles=True, guards=True, graph_breaks=True)    
+
+
+
     def remove_temp_filenames(temp_filenames_list):
         for temp_filename in temp_filenames_list: 
             if temp_filename!= None and os.path.isfile(temp_filename):
@@ -4094,7 +4104,7 @@ def generate_video(
     hunyuan_custom_edit =  hunyuan_custom and "edit" in model_filename
     hunyuan_avatar = "hunyuan_video_avatar" in model_filename
     fantasy = base_model_type in ["fantasy"]
-    multitalk = base_model_type in ["multitalk", "vace_multitalk_14B"]
+    multitalk = model_def.get("multitalk_class", False)
     flux = base_model_type in ["flux"]
 
     if "B" in audio_prompt_type or "X" in audio_prompt_type:
@@ -4821,8 +4831,9 @@ def generate_preview(model_type, latents):
     import einops
     if latents is None: return None
     model_handler = get_model_handler(model_type)
+    base_model_type = get_base_model_type(model_type)
     if hasattr(model_handler, "get_rgb_factors"):
-        latent_rgb_factors, latent_rgb_factors_bias = model_handler.get_rgb_factors(model_type)
+        latent_rgb_factors, latent_rgb_factors_bias = model_handler.get_rgb_factors(base_model_type )
     else:
         return None
     if latent_rgb_factors is None: return None
@@ -5520,7 +5531,7 @@ def prepare_inputs_dict(target, inputs, model_type = None, model_filename = None
     if not test_any_sliding_window( base_model_type):
         pop += ["sliding_window_size", "sliding_window_overlap", "sliding_window_overlap_noise", "sliding_window_discard_last_frames", "sliding_window_color_correction_strength"]
 
-    if not base_model_type in ["fantasy", "multitalk", "vace_multitalk_14B"]:
+    if not (base_model_type in ["fantasy"] or model_def.get("multitalk_class", False)):
         pop += ["audio_guidance_scale", "speakers_locations"]
 
     if not model_def.get("embedded_guidance", False) or model_def.get("no_guidance", False):
@@ -6505,7 +6516,7 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
             vace = test_vace_module(base_model_type)
             phantom = base_model_type in ["phantom_1.3B", "phantom_14B"]
             fantasy = base_model_type in ["fantasy"]
-            multitalk = base_model_type in ["multitalk", "vace_multitalk_14B"]
+            multitalk = model_def.get("multitalk_class", False)            
             hunyuan_t2v = "hunyuan_video_720" in model_filename
             hunyuan_i2v = "hunyuan_video_i2v" in model_filename
             hunyuan_video_custom = "hunyuan_video_custom" in model_filename
