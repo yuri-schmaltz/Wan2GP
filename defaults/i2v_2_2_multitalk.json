@@ -8,7 +8,7 @@
 		"URLs": "i2v_2_2",
 		"URLs2": "i2v_2_2",
 		"group": "wan2_2",
-		"visible": true
+		"visible": false
 	},
 	"switch_threshold" : 900,
 	"guidance_scale" : 3.5,
