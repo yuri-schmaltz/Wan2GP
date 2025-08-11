@@ -1620,7 +1620,7 @@ def _parse_args():
 def get_lora_dir(model_type):
     model_family = get_model_family(model_type)
     base_model_type = get_base_model_type(model_type)
-    i2v = test_class_i2v(model_type) and  base_model_type == "i2v_2_2"
+    i2v = test_class_i2v(model_type) or  base_model_type == "i2v_2_2"
     if model_family == "wan":
         lora_dir =args.lora_dir
         if i2v and len(lora_dir)==0:
