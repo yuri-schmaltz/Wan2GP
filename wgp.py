@@ -13,11 +13,13 @@ from datetime import datetime
 import gradio as gr
 import random
 import json
+import numpy as np
 import importlib
 from shared.utils import notification_sound
 from shared.utils.loras_mutipliers import preparse_loras_multipliers, parse_loras_multipliers
-from shared.utils.utils import cache_video, convert_tensor_to_image, save_image, get_video_info, get_file_creation_date, convert_image_to_video
-from shared.utils.utils import extract_audio_tracks, combine_video_with_audio_tracks, combine_and_concatenate_video_with_audio_tracks, cleanup_temp_audio_files, calculate_new_dimensions
+from shared.utils.utils import convert_tensor_to_image, save_image, get_video_info, get_file_creation_date, convert_image_to_video, calculate_new_dimensions
+from shared.utils.audio_video import extract_audio_tracks, combine_video_with_audio_tracks, combine_and_concatenate_video_with_audio_tracks, cleanup_temp_audio_files,  save_video, save_image
+from shared.utils.audio_video import save_image_metadata, read_image_metadata
 from shared.match_archi import match_nvidia_architecture
 from shared.attention import get_attention_modes, get_supported_attention_modes
 from huggingface_hub import hf_hub_download, snapshot_download    
@@ -53,7 +55,7 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.5.8"
-WanGP_version = "7.76"
+WanGP_version = "7.77"
 settings_version = 2.23
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
@@ -1712,7 +1714,8 @@ if not Path(server_config_filename).is_file():
         "transformer_types": [], 
         "transformer_quantization": "int8",
         "text_encoder_quantization" : "int8",
-        "save_path": "outputs", #os.path.join(os.getcwd(), 
+        "save_path": "outputs",  
+        "image_save_path": "outputs",  
         "compile" : "",
         "metadata_type": "metadata",
         "boost" : 1,
@@ -2186,7 +2189,11 @@ if len(args.vae_config) > 0:
     vae_config = int(args.vae_config)
 
 reload_needed = False
-save_path = server_config.get("save_path", os.path.join(os.getcwd(), "gradio_outputs"))
+save_path = server_config.get("save_path", os.path.join(os.getcwd(), "outputs"))
+image_save_path = server_config.get("image_save_path", os.path.join(os.getcwd(), "outputs"))
+if not "video_output_codec" in server_config: server_config["video_output_codec"]= "libx264_8"
+if not "image_output_codec" in server_config: server_config["image_output_codec"]= "jpeg_95"
+
 preload_model_policy = server_config.get("preload_model_policy", []) 
 
 
@@ -2699,6 +2706,7 @@ def apply_changes(  state,
                     VAE_precision_choice,
                     mixed_precision_choice,
                     save_path_choice,
+                    image_save_path_choice,
                     attention_choice,
                     compile_choice,
                     profile_choice,
@@ -2718,6 +2726,9 @@ def apply_changes(  state,
                     notification_sound_volume_choice = 50,
                     max_frames_multiplier_choice = 1,
                     display_stats_choice = 0,
+                    video_output_codec_choice = None,
+                    image_output_codec_choice = None,
+                    audio_output_codec_choice = None,
                     last_resolution_choice = None,
 ):
     if args.lock_config:
@@ -2730,6 +2741,7 @@ def apply_changes(  state,
         "transformer_types": transformer_types_choices, 
         "text_encoder_quantization" : text_encoder_quantization_choice,
         "save_path" : save_path_choice,
+        "image_save_path" : image_save_path_choice,
         "compile" : compile_choice,
         "profile" : profile_choice,
         "vae_config" : vae_config_choice,
@@ -2751,6 +2763,9 @@ def apply_changes(  state,
         "notification_sound_volume" : notification_sound_volume_choice,
         "max_frames_multiplier" : max_frames_multiplier_choice,
         "display_stats" : display_stats_choice,
+        "video_output_codec" : video_output_codec_choice,
+        "image_output_codec" : image_output_codec_choice,
+        "audio_output_codec" : audio_output_codec_choice,
         "last_model_type" : state["model_type"],
         "last_model_per_family":  state["last_model_per_family"],
         "last_advanced_choice": state["advanced"], 
@@ -2784,6 +2799,7 @@ def apply_changes(  state,
     vae_config = server_config["vae_config"]
     boost = server_config["boost"]
     save_path = server_config["save_path"]
+    image_save_path = server_config["image_save_path"]
     preload_model_policy = server_config["preload_model_policy"]
     transformer_quantization = server_config["transformer_quantization"]
     transformer_dtype_policy = server_config["transformer_dtype_policy"]
@@ -2791,7 +2807,9 @@ def apply_changes(  state,
     transformer_types = server_config["transformer_types"]
     model_filename = get_model_filename(transformer_type, transformer_quantization, transformer_dtype_policy)
     state["model_filename"] = model_filename
-    if all(change in ["attention_mode", "vae_config", "boost", "save_path", "metadata_type", "clear_file_list", "fit_canvas", "depth_anything_v2_variant", "notification_sound_enabled", "notification_sound_volume", "mmaudio_enabled", "max_frames_multiplier", "display_stats"] for change in changes ):
+    if all(change in ["attention_mode", "vae_config", "boost", "save_path", "metadata_type", "clear_file_list", "fit_canvas", "depth_anything_v2_variant", 
+                      "notification_sound_enabled", "notification_sound_volume", "mmaudio_enabled", "max_frames_multiplier", "display_stats",
+                      "video_output_codec", "image_output_codec", "audio_output_codec"] for change in changes ):
         model_family = gr.Dropdown()
         model_choice = gr.Dropdown()
     else:
@@ -2801,18 +2819,6 @@ def apply_changes(  state,
     header = generate_header(state["model_type"], compile=compile, attention_mode= attention_mode)
     mmaudio_enabled = server_config["mmaudio_enabled"] > 0
     return "<DIV ALIGN=CENTER>The new configuration has been succesfully applied</DIV>", header, model_family, model_choice, gr.Row(visible= server_config["enhancer_enabled"] == 1),  gr.Row(visible= mmaudio_enabled), gr.Column(visible= mmaudio_enabled)
-
-
-
-from moviepy.editor import ImageSequenceClip
-import numpy as np
-
-def save_video(final_frames, output_path, fps=24):
-    assert final_frames.ndim == 4 and final_frames.shape[3] == 3, f"invalid shape: {final_frames} (need t h w c)"
-    if final_frames.dtype != np.uint8:
-        final_frames = (final_frames * 255).astype(np.uint8)
-    ImageSequenceClip(list(final_frames), fps=fps).write_videofile(output_path, verbose= False)
-
 
 def get_gen_info(state):
     cache = state.get("gen", None)
@@ -3754,7 +3760,7 @@ def edit_video(
     any_change = False
     if sample != None:
         video_path =get_available_filename(save_path, video_source, "_tmp") if any_mmaudio or has_already_audio else get_available_filename(save_path, video_source, "_post")  
-        cache_video( tensor=sample[None], save_file=video_path, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1))
+        save_video( tensor=sample[None], save_file=video_path, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1), codec_type= server_config.get("video_output_codec", None))
 
         if any_mmaudio or has_already_audio: tmp_path = video_path
         any_change = True
@@ -3970,7 +3976,7 @@ def generate_video(
     process_map_video_guide = { "P": "pose", "D" : "depth", "S": "scribble", "E": "canny", "L": "flow", "C": "gray", "M": "inpaint", "U": "identity"}
     processes_names = { "pose": "Open Pose", "depth": "Depth Mask", "scribble" : "Shapes", "flow" : "Flow Map", "gray" : "Gray Levels", "inpaint" : "Inpaint Mask", "identity": "Identity Mask", "raw" : "Raw Format", "canny" : "Canny Edges"}
 
-    global wan_model, offloadobj, reload_needed, save_path
+    global wan_model, offloadobj, reload_needed
     gen = get_gen_info(state)
     torch.set_grad_enabled(False) 
     if mode.startswith("edit_"):
@@ -4238,6 +4244,7 @@ def generate_video(
 
     torch.set_grad_enabled(False) 
     os.makedirs(save_path, exist_ok=True)
+    os.makedirs(image_save_path, exist_ok=True)
     gc.collect()
     torch.cuda.empty_cache()
     wan_model._interrupt = False
@@ -4708,18 +4715,19 @@ def generate_video(
                 video_path = os.path.join(save_path, file_name)
                 any_mmaudio = MMAudio_setting != 0 and server_config.get("mmaudio_enabled", 0) != 0 and sample.shape[1] >=fps
 
-                if is_image:
-                    sample =  sample.permute(1,2,3,0)  #c f h w -> f h w c
-                    new_video_path = []
+                if is_image:    
+                    image_path = os.path.join(image_save_path, file_name)
+                    sample =  sample.transpose(1,0)  #c f h w -> f c h w 
+                    new_image_path = []
                     for no, img in enumerate(sample):  
-                        img = Image.fromarray((127.5 * (img + 1.0)).cpu().byte().numpy())
-                        img_path = os.path.splitext(video_path)[0] + ("" if no==0 else f"_{no}") + ".jpg" 
-                        new_video_path.append(img_path)
-                        img.save(img_path)
-                    video_path= new_video_path
+                        img_path = os.path.splitext(image_path)[0] + ("" if no==0 else f"_{no}") + ".jpg" 
+                        new_image_path.append(save_image(img, save_file = img_path, quality = server_config.get("image_output_codec", None)))
+
+                    video_path= new_image_path
                 elif len(control_audio_tracks) > 0 or len(source_audio_tracks) > 0 or output_new_audio_filepath is not None or any_mmaudio or output_new_audio_data is not None or audio_source is not None:
+                    video_path = os.path.join(save_path, file_name)
                     save_path_tmp = video_path[:-4] + "_tmp.mp4"
-                    cache_video( tensor=sample[None], save_file=save_path_tmp, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1))
+                    save_video( tensor=sample[None], save_file=save_path_tmp, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1), codec_type = server_config.get("video_output_codec", None))
                     output_new_audio_temp_filepath = None
                     new_audio_from_start =  reset_control_aligment
                     source_audio_duration = source_video_frames_count / fps
@@ -4746,7 +4754,7 @@ def generate_video(
                     if output_new_audio_temp_filepath is not None: os.remove(output_new_audio_temp_filepath)
 
                 else:
-                    cache_video( tensor=sample[None], save_file=video_path, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1))
+                    save_video( tensor=sample[None], save_file=video_path, fps=output_fps, nrow=1, normalize=True, value_range=(-1, 1),  codec_type= server_config.get("video_output_codec", None))
 
                 end_time = time.time()
 
@@ -4756,6 +4764,11 @@ def generate_video(
                 inputs.pop("mode")
                 inputs["model_type"] = model_type
                 inputs["model_filename"] = original_filename
+                if is_image:
+                    inputs["image_quality"] = server_config.get("image_output_codec", None)
+                else:
+                    inputs["video_quality"] = server_config.get("video_output_codec", None)
+
                 modules = get_model_recursive_prop(model_type, "modules", return_list= True)
                 if len(modules) > 0 : inputs["modules"] = modules
                 if len(transformer_loras_filenames) > 0:
@@ -4778,8 +4791,7 @@ def generate_video(
                             json.dump(configs, f, indent=4)
                     elif metadata_choice == "metadata":
                         if is_image:
-                            with Image.open(path) as img:
-                                img.save(path, comment=json.dumps(configs))
+                            save_image_metadata(path, configs)
                         else:
                             from mutagen.mp4 import MP4
                             file = MP4(path)
@@ -5690,7 +5702,7 @@ def has_video_file_extension(filename):
 
 def has_image_file_extension(filename):
     extension = os.path.splitext(filename)[-1]
-    return extension in [".jpeg", ".jpg", ".png", ".bmp", ".tiff"]
+    return extension in [".jpeg", ".jpg", ".png", ".webp", ".bmp", ".tiff"]
 
 def add_videos_to_gallery(state, input_file_list, choice, files_to_load):
     gen = get_gen_info(state)
@@ -5795,7 +5807,7 @@ def use_video_settings(state, input_file_list, choice):
 
 def get_settings_from_file(state, file_path, allow_json, merge_with_defaults, switch_type_if_compatible):    
     configs = None
-    tags = None
+    any_image_or_video = False
     if file_path.endswith(".json") and allow_json:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -5807,22 +5819,22 @@ def get_settings_from_file(state, file_path, allow_json, merge_with_defaults, sw
         try:
             file = MP4(file_path)
             tags = file.tags['©cmt'][0] 
+            configs = json.loads(tags)
+            any_image_or_video = True
         except:
             pass
     elif has_image_file_extension(file_path):
         try:
-            with Image.open(file_path) as img:
-                tags = img.info["comment"]
+            configs = read_image_metadata(file_path)
+            any_image_or_video = True
         except:
             pass
-    if tags is not None:
-        try:
-            configs = json.loads(tags)
-            if not "WanGP" in configs.get("type", ""): configs = None 
-        except:
-            configs = None
-    if configs == None:
-        return None, False
+    if configs is None: return None, False
+    try:
+        if not "WanGP" in configs.get("type", ""): configs = None 
+    except:
+        configs = None
+        
 
     current_model_filename = state["model_filename"]
     current_model_type = state["model_type"]
@@ -5848,7 +5860,7 @@ def get_settings_from_file(state, file_path, allow_json, merge_with_defaults, sw
         configs = defaults
     configs["model_type"] = model_type
 
-    return configs, tags != None
+    return configs, any_image_or_video
 
 def record_image_mode_tab(state, evt:gr.SelectData):
     state["image_mode_tab"] = 0 if evt.index ==0 else 1
@@ -7849,10 +7861,6 @@ def generate_configuration_tab(state, blocks, header, model_family, model_choice
                     label="User Interface Theme. You will need to restart the App the see new Theme."
                 )
 
-                save_path_choice = gr.Textbox(
-                    label="Output Folder for Generated Videos (need to restart app to be taken into account)",
-                    value=server_config.get("save_path", save_path)
-                )
 
             with gr.Tab("Performance"):
 
@@ -7976,6 +7984,53 @@ def generate_configuration_tab(state, blocks, header, model_family, model_choice
                     label="MMAudio (if enabled, 10 GB of extra models will be downloaded)"
                 )
 
+            with gr.Tab("Outputs"):
+
+                video_output_codec_choice = gr.Dropdown(
+                    choices=[
+                        ("x265 Balanced Quality (CRF 28)", 'libx265_28'),
+                        ("x264 Balanced Quality (Level 8)", 'libx264_8'),
+                        ("x265 High Quality (CRF 8)", 'libx265_8'),
+                        ("x264 High Quality (Level 10)", 'libx264_10'),
+                        ("x264 Lossless", 'libx264_lossless'),
+                    ],
+                    value=server_config.get("video_output_codec", "libx264_8"),
+                    label="Video Codec to use"
+                )
+
+                image_output_codec_choice = gr.Dropdown(
+                    choices=[
+                        ("JPEG Quality 85", 'jpeg_85'),
+                        ("WEBP Quality 85", 'webp_85'),
+                        ("JPEG Quality 95", 'jpeg_95'),
+                        ("WEBP Quality 95", 'webp_95'),
+                        ("WEBP Lossless", 'webp_lossless'),
+                        ("PNG Lossless", 'png'),
+                    ],
+                    value=server_config.get("image_output_codec", "jpeg_95"),
+                    label="Image Codec to use"
+                )
+
+                audio_output_codec_choice = gr.Dropdown(
+                    choices=[
+                        ("AAC 128 kbit", 'aac_128'),
+                    ],
+                    value=server_config.get("audio_output_codec", "aac_128"),
+                    visible = False,
+                    label="Audio Codec to use"
+                )
+
+                video_save_path_choice = gr.Textbox(
+                    label="Output Folder for Generated Videos (need to restart app to be taken into account)",
+                    value=server_config.get("save_path", save_path)
+                )
+
+                image_save_path_choice = gr.Textbox(
+                    label="Output Folder for Generated Images (need to restart app to be taken into account)",
+                    value=server_config.get("image_save_path", image_save_path)
+                )
+
+
             with gr.Tab("Notifications"):
                 gr.Markdown("### Notification Settings")
                 notification_sound_enabled_choice = gr.Dropdown(
@@ -8008,7 +8063,8 @@ def generate_configuration_tab(state, blocks, header, model_family, model_choice
                     text_encoder_quantization_choice,
                     VAE_precision_choice,
                     mixed_precision_choice,
-                    save_path_choice,
+                    video_save_path_choice,
+                    image_save_path_choice,
                     attention_choice,
                     compile_choice,                            
                     profile_choice,
@@ -8028,6 +8084,9 @@ def generate_configuration_tab(state, blocks, header, model_family, model_choice
                     notification_sound_volume_choice,
                     max_frames_multiplier_choice,
                     display_stats_choice,
+                    video_output_codec_choice,
+                    image_output_codec_choice,
+                    audio_output_codec_choice,
                     resolution,
                 ],
                 outputs= [msg , header, model_family, model_choice, prompt_enhancer_row, mmaudio_tab, PP_MMAudio_col]
@@ -8626,7 +8685,7 @@ def create_ui():
             with gr.Tab("Guides", id="info") as info_tab:
                 generate_info_tab()
             with gr.Tab("Video Mask Creator", id="video_mask_creator") as video_mask_creator:
-                matanyone_app.display(main_tabs, tab_state, video_guide, image_guide, video_mask, image_mask, image_refs)
+                matanyone_app.display(main_tabs, tab_state, server_config, video_guide, image_guide, video_mask, image_mask, image_refs)
             if not args.lock_config:
                 with gr.Tab("Downloads", id="downloads") as downloads_tab:
                     generate_download_tab(lset_name, loras_choices, state)
@@ -8662,5 +8721,4 @@ if __name__ == "__main__":
         else:
             url = "http://" + server_name 
         webbrowser.open(url + ":" + str(server_port), new = 0, autoraise = True)
-    demo.launch(favicon_path="favicon.png",  server_name=server_name, server_port=server_port, share=args.share, allowed_paths=[save_path])
-
+    demo.launch(favicon_path="favicon.png",  server_name=server_name, server_port=server_port, share=args.share, allowed_paths=[save_path] + [] if save_path == image_save_path else [image_save_path] )

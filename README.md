@@ -20,6 +20,20 @@ WanGP supports the Wan (and derived models), Hunyuan Video and LTV Video models 
 **Follow DeepBeepMeep on Twitter/X to get the Latest News**: https://x.com/deepbeepmeep
 
 ## 🔥 Latest Updates : 
+
+### August 11 2025: WanGP v7.77 - Lucky Day
+
+This is your lucky day ! thanks to new configuration options that will let you store generated Videos and Images in lossless compressed formats, you will find they in fact they look two times better without doing anything !
+
+Just kidding, they will be only marginally better, but at least this opens the way to professionnal editing.
+
+Support:
+- Video: x264, x264 lossless, x265
+- Images: jpeg, png, webp, wbp lossless
+Generation Settings are stored in each of the above regardless of the format (that was the hard part).
+
+Also you can now choose different output directories for images and videos.
+
 ### August 10 2025: WanGP v7.76 - Faster than the VAE ...
 We have a funny one here today: FastWan 2.2 5B, the Fastest Video Generator, only 20s to generate 121 frames at 720p. The snag is that VAE is twice as slow... 
 Thanks to Kijai for extracting the Lora that is used to build the corresponding finetune.

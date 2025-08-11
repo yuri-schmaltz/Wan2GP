@@ -46,6 +46,7 @@ soundfile
 ffmpeg-python
 pyannote.audio
 pynvml
+piexif
 #huggingface_hub[hf_xet]  #slow down everything !!!!
 # num2words
 # spacy
