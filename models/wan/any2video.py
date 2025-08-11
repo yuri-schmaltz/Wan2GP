@@ -97,7 +97,7 @@ class WanAny2V:
                 device=self.device,
                 checkpoint_path=os.path.join(checkpoint_dir , 
                                             config.clip_checkpoint),
-                tokenizer_path=os.path.join(checkpoint_dir ,  "clip_vit_large_patch14"))
+                tokenizer_path=os.path.join(checkpoint_dir , "xlm-roberta-large"))
 
 
         if base_model_type in ["ti2v_2_2"]:
