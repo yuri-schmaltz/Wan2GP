@@ -83,7 +83,7 @@ class family_handler():
         vace_class = base_model_type in ["vace_14B", "vace_1.3B", "vace_multitalk_14B"] 
         extra_model_def["vace_class"] = vace_class
 
-        if base_model_type in ["multitalk", "vace_multitalk_14B"]:
+        if base_model_type in ["multitalk", "vace_multitalk_14B", "i2v_2_2_multitalk"]:
             fps = 25
         elif base_model_type in ["fantasy"]:
             fps = 23

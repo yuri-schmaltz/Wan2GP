@@ -603,10 +603,9 @@ class WanAny2V:
         if recam:
             # should be be in fact in input_frames since it is control video not a video to be extended
             target_camera = model_mode
-            width = input_video.shape[2]
-            height = input_video.shape[1]
+            height,width = input_video.shape[-2:]
             input_video = input_video.to(dtype=self.dtype , device=self.device)
-            source_latents = self.vae.encode([input_video])[0] #.to(dtype=self.dtype, device=self.device)
+            source_latents = self.vae.encode([input_video])[0].unsqueeze(0) #.to(dtype=self.dtype, device=self.device)
             del input_video
             # Process target camera (recammaster)
             from shared.utils.cammmaster_tools import get_camera_embedding
@@ -617,7 +616,7 @@ class WanAny2V:
         # Video 2 Video
         if denoising_strength < 1. and input_frames != None:
             height, width = input_frames.shape[-2:]
-            source_latents = self.vae.encode([input_frames])[0]
+            source_latents = self.vae.encode([input_frames])[0].unsqueeze(0)
             injection_denoising_step = 0
             inject_from_start = False
             if input_frames != None and denoising_strength < 1 :
@@ -630,7 +629,7 @@ class WanAny2V:
                 if len(keep_frames_parsed) == 0  or image_outputs or  (overlapped_frames_num + len(keep_frames_parsed)) == input_frames.shape[1] and all(keep_frames_parsed) : keep_frames_parsed = [] 
                 injection_denoising_step = int(sampling_steps * (1. - denoising_strength) )
                 latent_keep_frames = []
-                if source_latents.shape[1] < lat_frames or len(keep_frames_parsed) > 0:
+                if source_latents.shape[2] < lat_frames or len(keep_frames_parsed) > 0:
                     inject_from_start = True
                     if len(keep_frames_parsed) >0 :
                         if overlapped_frames_num > 0: keep_frames_parsed = [True] * overlapped_frames_num + keep_frames_parsed
@@ -792,14 +791,14 @@ class WanAny2V:
                 noise = torch.randn(batch_size, *target_shape, dtype=torch.float32, device=self.device, generator=seed_g)
                 if inject_from_start:
                     new_latents = latents.clone()
-                    new_latents[:,:, :source_latents.shape[1] ] = noise[:, :, :source_latents.shape[1] ] * sigma + (1 - sigma) * source_latents.unsqueeze(0)
+                    new_latents[:,:, :source_latents.shape[2] ] = noise[:, :, :source_latents.shape[2] ] * sigma + (1 - sigma) * source_latents
                     for latent_no, keep_latent in enumerate(latent_keep_frames):
                         if not keep_latent:
                             new_latents[:, :, latent_no:latent_no+1 ] = latents[:, :, latent_no:latent_no+1]
                     latents = new_latents
                     new_latents = None
                 else:
-                    latents = noise * sigma + (1 - sigma) * source_latents.unsqueeze(0)
+                    latents = noise * sigma + (1 - sigma) * source_latents
                 noise = None
 
             if extended_overlapped_latents != None:
@@ -811,7 +810,7 @@ class WanAny2V:
                         zz[0:16, ref_images_count:extended_overlapped_latents.shape[2] ]   = extended_overlapped_latents[0, :, ref_images_count:]  * (1.0 - overlap_noise_factor) + torch.randn_like(extended_overlapped_latents[0, :, ref_images_count:] ) * overlap_noise_factor 
 
             if target_camera != None:
-                latent_model_input = torch.cat([latents, source_latents.unsqueeze(0).expand(*expand_shape)], dim=2) # !!!!
+                latent_model_input = torch.cat([latents, source_latents.expand(*expand_shape)], dim=2)
             else:
                 latent_model_input = latents
 
