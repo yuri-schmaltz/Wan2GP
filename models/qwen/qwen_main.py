@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch, json, os
+import math
 
 from diffusers.image_processor import VaeImageProcessor
 from .transformer_qwenimage import QwenImageTransformer2DModel
@@ -31,13 +32,7 @@ class model_factory():
         VAE_dtype = torch.float32,
         mixed_precision_transformer = False
     ):
-        
-        with open( os.path.join(checkpoint_dir, "qwen_scheduler_config.json"), 'r', encoding='utf-8') as f:
-            scheduler_config = json.load(f)
-        scheduler_config.pop("_class_name")
-        scheduler_config.pop("_diffusers_version")
-
-        scheduler = FlowMatchEulerDiscreteScheduler(**scheduler_config)
+    
 
         transformer_filename = model_filename[0]
         tokenizer = AutoTokenizer.from_pretrained(os.path.join(checkpoint_dir,"Qwen2.5-VL-7B-Instruct")) 
@@ -61,13 +56,11 @@ class model_factory():
 
         vae = offload.fast_load_transformers_model( os.path.join(checkpoint_dir,"qwen_vae.safetensors"), writable_tensors= True , modelClass=AutoencoderKLQwenImage, defaultConfigPath=os.path.join(checkpoint_dir,"qwen_vae_config.json"))
         
-        self.pipeline = QwenImagePipeline(vae, text_encoder, tokenizer, transformer, scheduler)
+        self.pipeline = QwenImagePipeline(vae, text_encoder, tokenizer, transformer)
         self.vae=vae
         self.text_encoder=text_encoder
         self.tokenizer=tokenizer
         self.transformer=transformer
-        self.scheduler=scheduler
-
 
     def generate(
         self,
@@ -86,6 +79,7 @@ class model_factory():
         video_prompt_type = "",
         VAE_tile_size = None, 
         joint_pass = True,
+        sample_solver='default',
         **bbargs
     ):
         # Generate with different aspect ratios
@@ -97,6 +91,44 @@ class model_factory():
         "3:4": (1140, 1472)
         }
         
+
+        if sample_solver =='lightning':
+            scheduler_config = {
+                "base_image_seq_len": 256,
+                "base_shift": math.log(3),  # We use shift=3 in distillation
+                "invert_sigmas": False,
+                "max_image_seq_len": 8192,
+                "max_shift": math.log(3),  # We use shift=3 in distillation
+                "num_train_timesteps": 1000,
+                "shift": 1.0,
+                "shift_terminal": None,  # set shift_terminal to None
+                "stochastic_sampling": False,
+                "time_shift_type": "exponential",
+                "use_beta_sigmas": False,
+                "use_dynamic_shifting": True,
+                "use_exponential_sigmas": False,
+                "use_karras_sigmas": False,
+            }
+        else:
+            scheduler_config = {
+                "base_image_seq_len": 256,
+                "base_shift": 0.5,
+                "invert_sigmas": False,
+                "max_image_seq_len": 8192,
+                "max_shift": 0.9,
+                "num_train_timesteps": 1000,
+                "shift": 1.0,
+                "shift_terminal": 0.02,
+                "stochastic_sampling": False,
+                "time_shift_type": "exponential",
+                "use_beta_sigmas": False,
+                "use_dynamic_shifting": True,
+                "use_exponential_sigmas": False,
+                "use_karras_sigmas": False
+            }
+
+        self.scheduler=FlowMatchEulerDiscreteScheduler(**scheduler_config)
+        self.pipeline.scheduler = self.scheduler 
         if VAE_tile_size is not None:
             self.vae.use_tiling  = VAE_tile_size[0] 
             self.vae.tile_latent_min_height  = VAE_tile_size[1] 

@@ -337,15 +337,15 @@ def save_image(tensor,
 def _get_format_info(quality):
     """Get format extension and parameters."""
     formats = {
-        # JPEG with torchvision (works)
-        'jpeg_95': {'ext': '.jpg', 'params': {'quality': 95}, 'use_pil': False},
-        'jpeg_85': {'ext': '.jpg', 'params': {'quality': 85}, 'use_pil': False},
-        'jpeg_70': {'ext': '.jpg', 'params': {'quality': 70}, 'use_pil': False},
-        'jpeg_50': {'ext': '.jpg', 'params': {'quality': 50}, 'use_pil': False},
-        
+        # JPEG with PIL (so 'quality' works)
+        'jpeg_95': {'ext': '.jpg', 'params': {'quality': 95}, 'use_pil': True},
+        'jpeg_85': {'ext': '.jpg', 'params': {'quality': 85}, 'use_pil': True},
+        'jpeg_70': {'ext': '.jpg', 'params': {'quality': 70}, 'use_pil': True},
+        'jpeg_50': {'ext': '.jpg', 'params': {'quality': 50}, 'use_pil': True},
+
         # PNG with torchvision
         'png': {'ext': '.png', 'params': {}, 'use_pil': False},
-        
+
         # WebP with PIL (for quality control)
         'webp_95': {'ext': '.webp', 'params': {'quality': 95}, 'use_pil': True},
         'webp_85': {'ext': '.webp', 'params': {'quality': 85}, 'use_pil': True},

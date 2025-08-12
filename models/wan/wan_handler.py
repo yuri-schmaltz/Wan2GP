@@ -108,7 +108,11 @@ class family_handler():
         "adaptive_projected_guidance" : True,  
         "tea_cache" : not (base_model_type in ["i2v_2_2", "ti2v_2_2" ] or "URLs2" in model_def),
         "mag_cache" : True,
-        
+        "sample_solvers":[
+                            ("unipc", "unipc"),
+                            ("euler", "euler"),
+                            ("dpm++", "dpm++"),
+                            ("flowmatch causvid", "causvid"), ]
         })
 
         return extra_model_def
@@ -208,9 +212,17 @@ class family_handler():
         if hasattr(wan_model, "clip"):
             pipe["text_encoder_2"] = wan_model.clip.model
         return wan_model, pipe
-    
+
+    @staticmethod
+    def fix_settings(base_model_type, settings_version, model_def, ui_defaults):
+        if ui_defaults.get("sample_solver", "") == "": 
+            ui_defaults["sample_solver"] = "unipc"
+
     @staticmethod
     def update_default_settings(base_model_type, model_def, ui_defaults):
+        ui_defaults.update({
+            "sample_solver": "unipc",
+        })
         if base_model_type in ["fantasy"]:
             ui_defaults.update({
                 "audio_guidance_scale": 5.0,

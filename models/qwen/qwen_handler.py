@@ -11,6 +11,9 @@ class family_handler():
     def query_model_def(base_model_type, model_def):
         model_def_output = {
             "image_outputs" : True,
+            "sample_solvers":[
+                            ("Default", "default"),
+                            ("Lightning", "lightning")]
         }
 
 
@@ -38,7 +41,7 @@ class family_handler():
         return  {  
             "repoId" : "DeepBeepMeep/Qwen_image", 
             "sourceFolderList" :  ["", "Qwen2.5-VL-7B-Instruct"],
-            "fileList" : [ ["qwen_vae.safetensors", "qwen_vae_config.json", "qwen_scheduler_config.json"], ["merges.txt", "tokenizer_config.json", "config.json", "vocab.json"] + computeList(text_encoder_filename)  ]
+            "fileList" : [ ["qwen_vae.safetensors", "qwen_vae_config.json"], ["merges.txt", "tokenizer_config.json", "config.json", "vocab.json"] + computeList(text_encoder_filename)  ]
             }
 
     @staticmethod
@@ -64,10 +67,17 @@ class family_handler():
 
         return pipe_processor, pipe
 
+
+    @staticmethod
+    def fix_settings(base_model_type, settings_version, model_def, ui_defaults):
+        if ui_defaults.get("sample_solver", "") == "": 
+            ui_defaults["sample_solver"] = "default"
+
     @staticmethod
     def update_default_settings(base_model_type, model_def, ui_defaults):
         ui_defaults.update({
             "guidance_scale":  4,
+            "sample_solver": "default",
         })            
         if model_def.get("reference_image", False):
             ui_defaults.update({

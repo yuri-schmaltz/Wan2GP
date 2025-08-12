@@ -54,7 +54,7 @@ global_queue_ref = []
 AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
-target_mmgp_version = "3.5.8"
+target_mmgp_version = "3.5.9"
 WanGP_version = "7.77"
 settings_version = 2.23
 max_source_video_frames = 3000
@@ -1972,11 +1972,11 @@ def get_settings_file_name(model_type):
     return  os.path.join(args.settings, model_type + "_settings.json")
 
 def fix_settings(model_type, ui_defaults):
-    if model_type == None: return
+    if model_type is None: return
 
-    video_settings_version =  ui_defaults.get("settings_version", 0)
+    settings_version =  ui_defaults.get("settings_version", 0)
     model_def = get_model_def(model_type)
-    model_type = get_base_model_type(model_type)
+    base_model_type = get_base_model_type(model_type)
 
     prompts = ui_defaults.get("prompts", "")
     if len(prompts) > 0:
@@ -1987,43 +1987,43 @@ def fix_settings(model_type, ui_defaults):
             image_prompt_type = "S" if image_prompt_type  == 0 else "SE"
         # if model_type == "flf2v_720p" and not "E" in image_prompt_type:
         #     image_prompt_type = "SE"
-        if video_settings_version <= 2:
+        if settings_version <= 2:
             image_prompt_type = image_prompt_type.replace("G","")
         ui_defaults["image_prompt_type"] = image_prompt_type
 
     if "lset_name" in ui_defaults: del ui_defaults["lset_name"]
 
     audio_prompt_type = ui_defaults.get("audio_prompt_type", None)
-    if video_settings_version < 2.2: 
-        if not model_type in ["vace_1.3B","vace_14B", "sky_df_1.3B", "sky_df_14B", "ltxv_13B"]:
+    if settings_version < 2.2: 
+        if not base_model_type in ["vace_1.3B","vace_14B", "sky_df_1.3B", "sky_df_14B", "ltxv_13B"]:
             for p in  ["sliding_window_size", "sliding_window_overlap", "sliding_window_overlap_noise", "sliding_window_discard_last_frames"]:
                 if p in ui_defaults: del ui_defaults[p]
 
         if audio_prompt_type == None :
-            if any_audio_track(model_type):
+            if any_audio_track(base_model_type):
                 audio_prompt_type ="A"
                 ui_defaults["audio_prompt_type"] = audio_prompt_type
 
 
     video_prompt_type = ui_defaults.get("video_prompt_type", "")
     any_reference_image = model_def.get("reference_image", False)
-    if model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_custom_audio", "hunyuan_avatar", "phantom_14B", "phantom_1.3B"] or any_reference_image:
+    if base_model_type in ["hunyuan_custom", "hunyuan_custom_edit", "hunyuan_custom_audio", "hunyuan_avatar", "phantom_14B", "phantom_1.3B"] or any_reference_image:
         if not "I" in video_prompt_type:  # workaround for settings corruption
             video_prompt_type += "I" 
-    if model_type in ["hunyuan"]:
+    if base_model_type in ["hunyuan"]:
         video_prompt_type = video_prompt_type.replace("I", "")
 
-    if model_type in ["flux"] and video_settings_version < 2.23:
+    if base_model_type in ["flux"] and settings_version < 2.23:
         video_prompt_type = video_prompt_type.replace("K", "").replace("I", "KI")
 
     remove_background_images_ref = ui_defaults.get("remove_background_images_ref", 1)
-    if video_settings_version < 2.22:
+    if settings_version < 2.22:
         if "I" in video_prompt_type:
             if remove_background_images_ref == 2:
                 video_prompt_type = video_prompt_type.replace("I", "KI")
         if remove_background_images_ref != 0:
             remove_background_images_ref = 1
-    if model_type in ["hunyuan_avatar"]: remove_background_images_ref = 0
+    if base_model_type in ["hunyuan_avatar"]: remove_background_images_ref = 0
     ui_defaults["remove_background_images_ref"] = remove_background_images_ref
 
     ui_defaults["video_prompt_type"] = video_prompt_type
@@ -2043,6 +2043,10 @@ def fix_settings(model_type, ui_defaults):
     if tea_cache_start_step_perc != None:
         del ui_defaults["tea_cache_start_step_perc"]
         ui_defaults["skip_steps_start_step_perc"] = tea_cache_start_step_perc
+
+    model_handler = get_model_handler(base_model_type)
+    if hasattr(model_handler, "fix_settings"):
+        model_handler.fix_settings(base_model_type, settings_version, model_def, ui_defaults)
 
 def get_default_settings(model_type):
     def get_default_prompt(i2v):
@@ -3174,8 +3178,8 @@ def select_video(state, input_file_list, event_data: gr.EventData):
                 values += [video_outpainting]
                 labels += ["Outpainting"]
             video_sample_solver = configs.get("sample_solver", "")
-            if model_family == "wan":
-                values += ["unipc" if len(video_sample_solver) ==0 else video_sample_solver]
+            if model_def.get("sample_solvers", None) is not None and len(video_sample_solver) > 0 :
+                values += [video_sample_solver]
                 labels += ["Sampler Solver"]                                        
             values += [video_resolution, video_length_summary, video_seed, video_guidance_scale, video_flow_shift, video_num_inference_steps]
             labels += [ "Resolution", video_length_label, "Seed", video_guidance_label, "Shift Scale", "Num Inference steps"]
@@ -5511,7 +5515,7 @@ def prepare_inputs_dict(target, inputs, model_type = None, model_filename = None
     if "force_fps" in inputs and len(inputs["force_fps"])== 0:
         pop += ["force_fps"]
 
-    if not get_model_family(model_type) == "wan" or diffusion_forcing:
+    if model_def.get("sample_solvers", None) is None:
         pop += ["sample_solver"]
     
     # if not (test_class_i2v(base_model_type) or diffusion_forcing or ltxv or recammaster or vace):
@@ -6974,16 +6978,15 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         with gr.Row(visible = model_def.get("guidance_max_phases",1) >1 and not (no_guidance and image_outputs)) as guidance_row2:
                             guidance2_scale = gr.Slider(1.0, 20.0, value=ui_defaults.get("guidance2_scale",5), step=0.5, label="Guidance2 (CFG)", visible=not (hunyuan_t2v or hunyuan_i2v or any_embedded_guidance) and not no_guidance)
                             switch_threshold = gr.Slider(0, 1000, value=ui_defaults.get("switch_threshold",0), step=1, label="Guidance / Model Switch Threshold", visible=not (hunyuan_t2v or hunyuan_i2v or any_embedded_guidance) and not no_guidance)
+                        sample_solver_choices = model_def.get("sample_solvers", None)
+                        with gr.Row(visible = sample_solver_choices is not None ) as sample_solver_row:
+                            if sample_solver_choices is None:
+                                sample_solver = gr.Dropdown( value="",  choices=[ ("", ""), ], visible= False, label= "Sampler Solver / Scheduler" )
+                            else:
+                                sample_solver = gr.Dropdown( value=ui_defaults.get("sample_solver", sample_solver_choices[0][1]), 
+                                    choices= sample_solver_choices, visible= True, label= "Sampler Solver / Scheduler"
+                                )
 
-                        with gr.Row(visible = get_model_family(model_type) == "wan" and not diffusion_forcing ) as sample_solver_row:
-                            sample_solver = gr.Dropdown( value=ui_defaults.get("sample_solver",""), 
-                                choices=[
-                                    ("unipc", ""),
-                                    ("euler", "euler"),
-                                    ("dpm++", "dpm++"),
-                                    ("flowmatch causvid", "causvid"),
-                                ], visible= True, label= "Sampler Solver / Scheduler"
-                            )
 
                         with gr.Row(visible = vace) as control_net_weights_row:
                             control_net_weight = gr.Slider(0.0, 2.0, value=ui_defaults.get("control_net_weight",1), step=0.1, label="Control Net Weight #1", visible=vace)

@@ -151,14 +151,12 @@ class QwenImagePipeline(): #DiffusionPipeline
         text_encoder,
         tokenizer,
         transformer,
-        scheduler,
     ):
         
         self.vae=vae
         self.text_encoder=text_encoder
         self.tokenizer=tokenizer
         self.transformer=transformer
-        self.scheduler=scheduler
 
         self.vae_scale_factor = 2 ** len(self.vae.temperal_downsample) if getattr(self, "vae", None) else 8
         # QwenImage latents are turned into 2x2 patches and packed. This means the latent width and height has to be divisible

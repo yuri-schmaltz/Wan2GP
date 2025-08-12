@@ -8,7 +8,8 @@ import sys
 import threading
 import time
 import numpy as np
-
+import os
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
 def generate_notification_beep(volume=50, sample_rate=44100):
     """Generate pleasant C major chord notification sound"""

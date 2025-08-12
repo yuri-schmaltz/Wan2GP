@@ -34,6 +34,8 @@ Generation Settings are stored in each of the above regardless of the format (th
 
 Also you can now choose different output directories for images and videos.
 
+unexpected luck: fixed lightning 8 steps for Qwen, and lightning 4 steps for Wan 2.2, now you just need 1x multiplier no weird numbers. 
+
 ### August 10 2025: WanGP v7.76 - Faster than the VAE ...
 We have a funny one here today: FastWan 2.2 5B, the Fastest Video Generator, only 20s to generate 121 frames at 720p. The snag is that VAE is twice as slow... 
 Thanks to Kijai for extracting the Lora that is used to build the corresponding finetune.
