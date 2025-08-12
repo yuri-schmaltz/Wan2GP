@@ -473,6 +473,13 @@ class QwenImageTransformer2DModel(nn.Module):
         first = next(iter(sd), None)
         if first == None:
             return sd
+
+        new_sd = {}
+        for k,v in sd.items():
+            k = k.replace(".lora.", ".lora_")
+            new_sd[k] = v
+        sd = new_sd  
+
         if first.startswith("transformer_blocks"):
             new_sd = {}
             for k,v in sd.items():
