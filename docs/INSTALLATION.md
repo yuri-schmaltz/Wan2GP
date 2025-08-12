@@ -58,6 +58,7 @@ pip install triton-windows
 pip install https://github.com/woct0rdho/SageAttention/releases/download/v2.1.1-windows/sageattention-2.1.1+cu126torch2.6.0-cp310-cp310-win_amd64.whl
 
 # Linux (manual compilation required)
+python -m pip install "setuptools<=75.8.2" --force-reinstall
 git clone https://github.com/thu-ml/SageAttention
 cd SageAttention 
 pip install -e .
@@ -80,6 +81,7 @@ RTX 50XX GPUs require PyTorch 2.7.0 (beta). This version may be less stable.
 
 ```shell
 # Clone and setup (same as above)
+python -m pip install "setuptools<=75.8.2" --force-reinstall
 git clone https://github.com/deepbeepmeep/Wan2GP.git
 cd Wan2GP
 conda create -n wan2gp python=3.10.9
