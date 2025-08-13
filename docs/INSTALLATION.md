@@ -10,7 +10,7 @@ This guide covers installation for different GPU generations and operating syste
 
 ## Installation for RTX 10XX to RTX 40XX (Stable)
 
-This installation uses PyTorch 2.6.0 which is well-tested and stable.
+This installation uses PyTorch 2.7.0 which is well-tested and stable.
 
 ### Step 1: Download and Setup Environment
 
@@ -27,8 +27,8 @@ conda activate wan2gp
 ### Step 2: Install PyTorch
 
 ```shell
-# Install PyTorch 2.6.0 with CUDA 12.4
-pip install torch==2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/test/cu124  
+# Install PyTorch 2.7.0 with CUDA 12.4
+pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --extra-index-url https://download.pytorch.org/whl/cu124
 ```
 
 ### Step 3: Install Dependencies
