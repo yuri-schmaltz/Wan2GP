@@ -11,7 +11,7 @@ sentencepiece
 open_clip_torch>=2.29.0
 
 # Video & media
-moviepy @ git+https://github.com/Zulko/moviepy.git
+moviepy==1.0.3
 av
 ffmpeg-python
 pygame>=2.1.0
@@ -45,6 +45,7 @@ torchdiffeq>=0.2.5
 tensordict>=0.6.1
 mmgp==3.5.10
 peft==0.15.0
+matplotlib
 
 # Utilities
 ftfy
