@@ -17,7 +17,7 @@
 		"group": "wan2_2"
     },
 	"num_inference_steps": 8,
-    "guidance_phases": 3.1,
+    "guidance_phases": 3,
     "guidance_scale": 3.5,
     "guidance2_scale": 1,
     "guidance3_scale": 1,
