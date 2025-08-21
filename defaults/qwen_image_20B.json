@@ -16,6 +16,6 @@
         "image_outputs": true
     },
     "prompt": "draw a hat",
-    "resolution": "1280x720",,
+    "resolution": "1280x720",
     "batch_size": 1
 }
