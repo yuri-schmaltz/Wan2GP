@@ -55,8 +55,8 @@ AUTOSAVE_FILENAME = "queue.zip"
 PROMPT_VARS_MAX = 10
 
 target_mmgp_version = "3.5.10"
-WanGP_version = "8.0"
-settings_version = 2.24
+WanGP_version = "8.01"
+settings_version = 2.25
 max_source_video_frames = 3000
 prompt_enhancer_image_caption_model, prompt_enhancer_image_caption_processor, prompt_enhancer_llm_model, prompt_enhancer_llm_tokenizer = None, None, None, None
 
@@ -2071,6 +2071,7 @@ def get_default_settings(model_type):
         model_def = get_model_def(model_type)
         base_model_type = get_base_model_type(model_type)
         ui_defaults = {
+            "settings_version" : settings_version,
             "prompt": get_default_prompt(i2v),
             "resolution": "1280x720" if "720" in base_model_type else "832x480",
             "video_length": 81,
