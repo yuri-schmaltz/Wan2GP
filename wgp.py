@@ -6588,9 +6588,9 @@ def get_resolution_choices(current_resolution_choice, model_resolutions= None):
             ("1920x832 (21:9)", "1920x832"),
             ("832x1920 (9:21)", "832x1920"),
             # 720p
+            ("1024x1024 (1:1)", "1024x1024"),
             ("1280x720 (16:9)", "1280x720"),
             ("720x1280 (9:16)", "720x1280"), 
-            ("1024x1024 (1:1)", "1024x1024"),
             ("1280x544 (21:9)", "1280x544"),
             ("544x1280 (9:21)", "544x1280"),
             ("1104x832 (4:3)", "1104x832"),
@@ -7096,10 +7096,10 @@ def generate_video_tab(update_form = False, state_dict = None, ui_defaults = Non
                         video_prompt_type_image_refs = gr.Dropdown(
                             choices=[
                                 ("None", ""),
-                                ("Conditional Images are People / Objects", "I"),
                                 ("Conditional Images is first Main Subject / Landscape and may be followed by People / Objects", "KI"),
+                                ("Conditional Images are People / Objects", "I"),
                                 ],
-                            value=filter_letters(video_prompt_type_value, "KFI"),
+                            value=filter_letters(video_prompt_type_value, "KI"),
                             visible = True,
                             show_label=False,
                             label="Reference Images Combination Method", scale = 2
