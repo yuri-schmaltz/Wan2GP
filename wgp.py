@@ -41,7 +41,12 @@ import shutil
 import glob
 import cv2
 from transformers.utils import logging
-logging.set_verbosity_error
+
+# Ensure that only error messages from the transformers library are logged.
+# The previous code imported the function but forgot to call it, leaving the
+# logging level unchanged. Adding the parentheses fixes the bug and explicitly
+# sets the verbosity to errors only.
+logging.set_verbosity_error()
 from preprocessing.matanyone  import app as matanyone_app
 from tqdm import tqdm
 import requests
